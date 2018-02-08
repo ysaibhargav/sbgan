@@ -106,3 +106,4 @@ venv.bak/
 
 *.py.swp
 out/
+*.pem
