@@ -49,7 +49,7 @@ class GAN(object):
             d_scope = "discriminator",
             hooks = None):
         # TODO: read about GraphDef and protobuf
-        data_placeholder = tf.placeholder(real_data.dtype, real_data.shape)
+        data_placeholder = tf.placeholder(tf.float32, real_data.shape)
         dataset = tf.data.Dataset.from_tensor_slices((real_data))
         dataset = dataset.shuffle(buffer_size = real_data.shape[0])
         #dataset = dataset.shuffle(buffer_size = 10000)
