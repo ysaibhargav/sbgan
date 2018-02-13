@@ -91,7 +91,7 @@ g_optimizer = tf.train.AdamOptimizer(0.0001)
 d_optimizer = g_optimizer 
 
 config = _config()
-hook1 = Hook(real_data.shape[0] // config.x_batch_size, plot_density)
+hook1 = Hook(1, plot_density)
 
 m = GAN(generator, discriminator, "vanilla")
 # TODO: cleanup code by placing session creation inside .train()
