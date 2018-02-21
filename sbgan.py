@@ -55,8 +55,6 @@ class SBGAN(object):
 
     def train(self,
             sess,
-            g_optimizer,
-            d_optimizer,
             real_data,
             config,
             g_scope = "generator",
@@ -116,13 +114,13 @@ class SBGAN(object):
 
         # train steps
         # TODO: annealing
-        g_phi_star = [self._svgd_phi_star(var_g[i], var_g, post_g[i], config)\
+        g_phi_star = [self._stein_phi_star(var_g[i], var_g, post_g[i], config)\
                 for i in range(n_g)]
         g_train_steps = [[tf.assign(_var_g, _var_g+eps*g_phi_star[i]) for i, _var_g \
                 in enumerate(var_g[j])] for j in range(ng)]
         g_train_steps = _flatten(g_train_steps) 
 
-        d_phi_star = [self._svgd_phi_star(var_d[i], var_d, post_d[i], config)\
+        d_phi_star = [self._stein_phi_star(var_d[i], var_d, post_d[i], config)\
                 for i in range(n_d)]
         d_train_steps = [[tf.assign(_var_d, _var_d+eps*d_phi_star[i]) for i, _var_d \
                 in enumerate(var_d[j])] for j in range(nd)]
