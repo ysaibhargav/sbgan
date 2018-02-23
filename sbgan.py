@@ -79,6 +79,7 @@ class SBGAN(object):
         return x, z, iterator
 
 
+    # TODO: scale prior 
     def _prior(self,
             params_group,
             config):
@@ -108,6 +109,8 @@ class SBGAN(object):
                 step_size 
                 prior_std
         """
+        N = len(real_data)
+
         def _get_var(scope):
             return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                 scope=scope)
@@ -124,20 +127,24 @@ class SBGAN(object):
         discriminators = [self.discriminator(d_scope+"_%d"%i) for i in range(self.n_d)]
 
         # posteriors
+        # TODO: scaling with n_g, n_d?
         post_g = [0. for _ in range(self.n_g)]
         for i in range(self.n_g):
             for j in range(self.n_d):
                 post_g[i] += tf.reduce_mean(\
-                        tf.log(discriminators[j](generators[i](z[0][i]))))
-            post_g[i] /= self.n_d
+                        tf.log(discriminators[j](generators[i](z[0][i])))) / \
+                        config.z_batch_size
+            post_g[i] *= N
 
         post_d = [0. for _ in range(self.n_d)]
         for i in range(self.n_d):
-            post_d[i] += tf.reduce_mean(tf.log(discriminators[i](x[i])))
+            post_d[i] += tf.reduce_mean(tf.log(discriminators[i](x[i]))) / \
+                    config.x_batch_size
             for j in range(self.n_g):
                 post_d[i] += tf.reduce_mean(\
-                        tf.log(1.-discriminators[i](generators[j](z[1][j]))))
-            post_d[i] /= self.n_g
+                        tf.log(1.-discriminators[i](generators[j](z[1][j])))) / \
+                        config.z_batch_size
+            post_d[i] *= N
 
         var_g = [_get_var(g_scope+"_%d"%i) for i in range(self.n_g)]
         var_d = [_get_var(d_scope+"_%d"%i) for i in range(self.n_d)]
@@ -180,4 +187,12 @@ class SBGAN(object):
                 except tf.errors.OutOfRangeError:
                     break
 
+            if hooks != None:
+                for hook in hooks:
+                    if epoch % hook.n == 0:
+                        out = sess.run([generator(z[0][i]) for i, generator in \
+                                enumerate(generators)])
+                        for i, _out in enumerate(out):
+                            hook.f(**{"g_z": _out, 
+                                "epoch": "%d_%d"%(epoch, i)})
 
