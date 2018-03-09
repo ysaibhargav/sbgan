@@ -109,3 +109,4 @@ out/
 MNIST-data/
 *.pem
 *tar.gz
+*.swo

@@ -1,6 +1,8 @@
 import tensorflow as tf
+import numpy as np
 import pdb
 from functools import partial
+from itertools import combinations
 
 
 class SBGAN(object):
@@ -17,24 +19,43 @@ class SBGAN(object):
         self.kernel = self._kernel(kernel)
 
 
-    # TODO: adaptively change bandwidth (page 6, section 5)
+    def _to_tf_vec(self,
+            x):
+        """ flattens every tensor in x and concats """
+        x = [tf.reshape(_x, [-1]) for _x in x]
+        return tf.concat(x, 0)
+
+
+    def _bandwidth(self,
+            particles):
+        """ adaptively computes the bandwidth to make kernels sum to ~1 """
+        if len(particles) == 1: return tf.constant(1.)
+
+        distances = []
+        _particles = [self._to_tf_vec(x) for x in particles]
+        for pair in combinations(_particles, 2):
+            x1, x2 = pair
+            distances.append(tf.sqrt(tf.reduce_sum((x1-x2)*(x1-x2))))
+
+        distances = tf.convert_to_tensor(distances)
+        m = tf.shape(distances)[0]//2
+        median = tf.nn.top_k(distances, m).values[tf.maximum(m-1, 0)]
+
+        return median**2/np.log(len(particles))
+
+
     def _kernel(self,
             kernel):
         def _rbf(x1, x2):
-            h = 1
-            
-            def _to_tf_vec(x):
-                x = [tf.reshape(_x, [-1]) for _x in x]
-                return tf.concat(x, 0)
-
             if type(x1).__name__ == 'list':
-                x1 = _to_tf_vec(x1)
+                x1 = self._to_tf_vec(x1)
             if type(x2).__name__ == 'list':
-                x2 = _to_tf_vec(x2)
+                x2 = self._to_tf_vec(x2)
 
-            return tf.exp(-tf.reduce_sum((x1-x2)*(x1-x2))/h)
+            return tf.exp(-tf.reduce_sum((x1-x2)*(x1-x2))/self.bandwidth)
             
         if kernel == "rbf":
+            self.bandwidth = tf.placeholder(dtype=tf.float32, shape=())
             return _rbf
 
 
@@ -45,14 +66,15 @@ class SBGAN(object):
         num_param = len(theta)
         phi_star = [0 for _ in range(num_param)]
 
+        h = self._bandwidth(particles)
         for i, particle in enumerate(particles):
             grad_log_post = tf.gradients(posterior[i], particle)
             grad_kernel = tf.gradients(self.kernel(particle, theta), \
                     particle)
+            kernel_dist = self.kernel(particle, theta)
 
             for j in range(num_param):
-                phi_star[j] += self.kernel(particle, theta)*grad_log_post[j] + \
-                        grad_kernel[j]
+                phi_star[j] += kernel_dist*grad_log_post[j] + grad_kernel[j]
 
         for j in range(num_param):
             phi_star[j] /= len(particles)
@@ -79,7 +101,7 @@ class SBGAN(object):
         return x, z, iterator
 
 
-    # TODO: scale prior 
+    # cauchy distribution
     def _prior(self,
             params_group,
             config):
@@ -156,6 +178,9 @@ class SBGAN(object):
         for i in range(self.n_g): post_g[i] += prior_g[i]
         for i in range(self.n_d): post_d[i] += prior_d[i]
 
+        g_bandwidth = self._bandwidth(var_g)
+        d_bandwidth = self._bandwidth(var_d)
+
         # train steps
         # TODO: annealing
         g_phi_star = [self._stein_phi_star(var_g[i], var_g, post_g) \
@@ -170,7 +195,6 @@ class SBGAN(object):
                 in enumerate(var_d[j])] for j in range(self.n_d)]
         d_train_steps = _flatten(d_train_steps) 
 
-
         init = tf.global_variables_initializer()
         sess.run(init)
 
@@ -181,8 +205,15 @@ class SBGAN(object):
 
             while True:
                 try:
-                    sess.run(g_train_steps, {eps: config.step_size})
-                    sess.run(d_train_steps, {eps: config.step_size})
+                    _g_bandwidth = sess.run(g_bandwidth)
+                    sess.run(g_train_steps, {\
+                            eps: config.step_size, 
+                            self.bandwidth: _g_bandwidth})
+
+                    _d_bandwidth = sess.run(d_bandwidth)
+                    sess.run(d_train_steps, {\
+                            eps: config.step_size,
+                            self.bandwidth: _d_bandwidth})
 
                 except tf.errors.OutOfRangeError:
                     break
