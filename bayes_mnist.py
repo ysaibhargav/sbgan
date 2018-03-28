@@ -24,7 +24,7 @@ class _config(object):
         self.z_std = 1
         self.num_epochs = 100 
         self.prior_std = 1
-        self.step_size = 1e-10 
+        self.step_size = 1e-3 
         self.summary_savedir = 'summary'
         self.summary_n = 1
 
@@ -64,8 +64,8 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
 
 def generator(z, scope="generator"):
     with tf.variable_scope(scope):
-        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE, 
-                weights_initializer=tf.random_normal_initializer(0, 1)):
+        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE): 
+                #weights_initializer=tf.random_normal_initializer(0, 1)):
             h1 = fc(z, 150, scope = "h1")
             h2 = fc(h1, 300, scope = "h2")
             h3 = fc(h2, 784, activation_fn = None, scope = "h3")
@@ -76,8 +76,8 @@ def generator(z, scope="generator"):
 # TODO: dropout
 def discriminator(x, scope="discriminator"):
     with tf.variable_scope(scope):
-        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE, 
-                weights_initializer=tf.random_normal_initializer(0, 1)):
+        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE): 
+                #weights_initializer=tf.random_normal_initializer(0, 1)):
             h1 = fc(x, 200, scope = "h1")
             h2 = fc(h1, 150, scope = "h2")
             h3 = fc(h2, 1, activation_fn = None, scope = "h3")
@@ -90,13 +90,10 @@ def discriminator(x, scope="discriminator"):
 mnist = tf.contrib.learn.datasets.load_dataset("mnist")
 real_data = mnist.train.images
 
-# copy by reference?
-# TODO: read about Adam
 config = _config()
 hook1 = Hook(1, show_result)
 
 m = SBGAN(generator, discriminator)
-# TODO: cleanup code by placing session creation inside .train()
 sess = tf.Session()
 #sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 m.train(sess, real_data, config, summary=False, hooks = [hook1])

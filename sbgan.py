@@ -7,7 +7,6 @@ from functools import partial
 from itertools import combinations
 
 
-# TODO: set up summaries
 class SBGAN(object):
     def __init__(self,
             generator,
@@ -33,7 +32,6 @@ class SBGAN(object):
             particles):
         """ adaptively computes the bandwidth to make kernels sum to ~1 """
         if len(particles) == 1: return tf.constant(1.)
-
         distances = []
         _particles = [self._to_tf_vec(x) for x in particles]
         for x1, x2 in combinations(_particles, 2):
@@ -80,7 +78,7 @@ class SBGAN(object):
         for j in range(num_param):
             phi_star[j] /= len(particles)
 
-        return phi_star
+        return phi_star 
 
 
     def _data_handler(self,
@@ -102,12 +100,14 @@ class SBGAN(object):
         return x, z, iterator
 
 
-    # TODO: check cauchy distribution
     def _prior(self,
             params_group,
             config):
         """ 
-        normal distribution 
+        xavier uniform 
+        """
+        return 0.
+        # uncomment following block for normal distribution
         """
         prior_loss = 0
         for param in params_group:
@@ -116,6 +116,7 @@ class SBGAN(object):
             prior_loss -= tf.reduce_sum(tf.multiply(param, param))
 
         return prior_loss / 2
+        """
 
 
     def train(self,
@@ -137,7 +138,7 @@ class SBGAN(object):
                 step_size 
                 prior_std
         """
-        N = len(real_data)
+        N = 1#len(real_data)
 
         def _get_var(scope):
             return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
@@ -150,7 +151,7 @@ class SBGAN(object):
         eps = tf.placeholder(dtype=tf.float32)
         
         # network initialisation
-        # TODO: initialize points from the prior (page 6, section 5)
+        # initialize points from the prior (page 6, section 5)
         generators = [self.generator(g_scope+"_%d"%i) for i in range(self.n_g)]
         discriminators = [self.discriminator(d_scope+"_%d"%i) for i in range(self.n_d)]
 
@@ -158,48 +159,26 @@ class SBGAN(object):
         g_labels_real = tf.constant(1., shape=(config.z_batch_size, 1))
         for i in range(self.n_g):
             for j in range(self.n_d):
-                post_g[i] += tf.reduce_mean(
+                post_g[i] -= tf.reduce_sum(
                         tf.nn.sigmoid_cross_entropy_with_logits(
                             labels=g_labels_real,
-                            logits=discriminators[j](generators[i](z[0][i])))) 
+                            logits=discriminators[j](generators[i](z[0][i]))))
             post_g[i] *= N
 
         post_d = [0. for _ in range(self.n_d)]
         d_labels_real = tf.constant(1., shape=(config.x_batch_size, 1))
         d_labels_fake = tf.constant(0., shape=(config.z_batch_size, 1))
         for i in range(self.n_d):
-            post_d[i] += tf.reduce_mean(
+            post_d[i] -= tf.reduce_sum(
                 tf.nn.sigmoid_cross_entropy_with_logits(
                     labels=d_labels_real,
                     logits=discriminators[i](x[i])))
             for j in range(self.n_g):
-                post_d[i] += tf.reduce_mean(
+                post_d[i] -= tf.reduce_sum(
                     tf.nn.sigmoid_cross_entropy_with_logits(
                         labels=d_labels_fake,
                         logits=discriminators[i](generators[j](z[1][j]))))
             post_d[i] *= N
-
-        """
-        # posteriors
-        # TODO: scaling with n_g, n_d?
-        post_g = [0. for _ in range(self.n_g)]
-        for i in range(self.n_g):
-            for j in range(self.n_d):
-                post_g[i] += tf.reduce_mean(\
-                        tf.log(discriminators[j](generators[i](z[0][i])))) / \
-                        1#config.z_batch_size
-            post_g[i] *= N
-
-        post_d = [0. for _ in range(self.n_d)]
-        for i in range(self.n_d):
-            post_d[i] += tf.reduce_mean(tf.log(discriminators[i](x[i]))) / \
-                    1#config.x_batch_size
-            for j in range(self.n_g):
-                post_d[i] += tf.reduce_mean(\
-                        tf.log(1.-discriminators[i](generators[j](z[1][j])))) / \
-                        1#config.z_batch_size
-            post_d[i] *= N
-        """
 
         var_g = [_get_var(g_scope+"_%d"%i) for i in range(self.n_g)]
         var_d = [_get_var(d_scope+"_%d"%i) for i in range(self.n_d)]
