@@ -110,3 +110,4 @@ MNIST-data/
 *.pem
 *tar.gz
 *.swo
+*.swn

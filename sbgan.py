@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import tensorflow as tf
 import numpy as np
 import pdb
@@ -5,6 +7,7 @@ from functools import partial
 from itertools import combinations
 
 
+# TODO: set up summaries
 class SBGAN(object):
     def __init__(self,
             generator,
@@ -33,8 +36,7 @@ class SBGAN(object):
 
         distances = []
         _particles = [self._to_tf_vec(x) for x in particles]
-        for pair in combinations(_particles, 2):
-            x1, x2 = pair
+        for x1, x2 in combinations(_particles, 2):
             distances.append(tf.sqrt(tf.reduce_sum((x1-x2)*(x1-x2))))
 
         distances = tf.convert_to_tensor(distances)
@@ -54,8 +56,8 @@ class SBGAN(object):
 
             return tf.exp(-tf.reduce_sum((x1-x2)*(x1-x2))/self.bandwidth)
             
+        self.bandwidth = tf.placeholder(dtype=tf.float32, shape=())
         if kernel == "rbf":
-            self.bandwidth = tf.placeholder(dtype=tf.float32, shape=())
             return _rbf
 
 
@@ -66,7 +68,6 @@ class SBGAN(object):
         num_param = len(theta)
         phi_star = [0 for _ in range(num_param)]
 
-        h = self._bandwidth(particles)
         for i, particle in enumerate(particles):
             grad_log_post = tf.gradients(posterior[i], particle)
             grad_kernel = tf.gradients(self.kernel(particle, theta), \
@@ -101,16 +102,20 @@ class SBGAN(object):
         return x, z, iterator
 
 
-    # cauchy distribution
+    # TODO: check cauchy distribution
     def _prior(self,
             params_group,
             config):
+        """ 
+        normal distribution 
+        """
         prior_loss = 0
         for param in params_group:
             param /= config.prior_std
-            prior_loss -= tf.reduce_mean(tf.multiply(param, param))
+            # TODO: why is this reduce_mean in BGAN?
+            prior_loss -= tf.reduce_sum(tf.multiply(param, param))
 
-        return prior_loss
+        return prior_loss / 2
 
 
     def train(self,
@@ -119,6 +124,7 @@ class SBGAN(object):
             config,
             g_scope="generator",
             d_scope="discriminator",
+            summary=False,
             hooks=None):
         """
         config: should have the following properties
@@ -148,6 +154,32 @@ class SBGAN(object):
         generators = [self.generator(g_scope+"_%d"%i) for i in range(self.n_g)]
         discriminators = [self.discriminator(d_scope+"_%d"%i) for i in range(self.n_d)]
 
+        post_g = [0. for _ in range(self.n_g)]
+        g_labels_real = tf.constant(1., shape=(config.z_batch_size, 1))
+        for i in range(self.n_g):
+            for j in range(self.n_d):
+                post_g[i] += tf.reduce_mean(
+                        tf.nn.sigmoid_cross_entropy_with_logits(
+                            labels=g_labels_real,
+                            logits=discriminators[j](generators[i](z[0][i]))[1])) 
+            post_g[i] *= N
+
+        post_d = [0. for _ in range(self.n_d)]
+        d_labels_real = tf.constant(1., shape=(config.x_batch_size, 1))
+        d_labels_fake = tf.constant(0., shape=(config.z_batch_size, 1))
+        for i in range(self.n_d):
+            post_d[i] += tf.reduce_mean(
+                tf.nn.sigmoid_cross_entropy_with_logits(
+                    labels=d_labels_real,
+                    logits=discriminators[i](x[i])[1]))
+            for j in range(self.n_g):
+                post_d[i] += tf.reduce_mean(
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels=d_labels_fake,
+                        logits=discriminators[i](generators[j](z[1][j]))[1]))
+            post_d[i] *= N
+
+        """
         # posteriors
         # TODO: scaling with n_g, n_d?
         post_g = [0. for _ in range(self.n_g)]
@@ -155,18 +187,19 @@ class SBGAN(object):
             for j in range(self.n_d):
                 post_g[i] += tf.reduce_mean(\
                         tf.log(discriminators[j](generators[i](z[0][i])))) / \
-                        config.z_batch_size
+                        1#config.z_batch_size
             post_g[i] *= N
 
         post_d = [0. for _ in range(self.n_d)]
         for i in range(self.n_d):
             post_d[i] += tf.reduce_mean(tf.log(discriminators[i](x[i]))) / \
-                    config.x_batch_size
+                    1#config.x_batch_size
             for j in range(self.n_g):
                 post_d[i] += tf.reduce_mean(\
                         tf.log(1.-discriminators[i](generators[j](z[1][j])))) / \
-                        config.z_batch_size
+                        1#config.z_batch_size
             post_d[i] *= N
+        """
 
         var_g = [_get_var(g_scope+"_%d"%i) for i in range(self.n_g)]
         var_d = [_get_var(d_scope+"_%d"%i) for i in range(self.n_d)]
@@ -195,12 +228,28 @@ class SBGAN(object):
                 in enumerate(var_d[j])] for j in range(self.n_d)]
         d_train_steps = _flatten(d_train_steps) 
 
+        if summary:
+            # TODO: summaries for gradients
+            for i, p in enumerate(prior_g):
+                tf.summary.scalar('prior_g_%i'%i, p)
+            for i, p in enumerate(prior_d):
+                tf.summary.scalar('prior_d_%i'%i, p)
+            tf.summary.scalar('g_bandwidth', g_bandwidth)
+            tf.summary.scalar('d_bandwidth', d_bandwidth)
+            for var in tf.trainable_variables():
+                tf.summary.histogram(var.name, var)
+
+            merged_summary_op = tf.summary.merge_all()
+            summary_writer = tf.summary.FileWriter(config.summary_savedir, 
+                    graph=tf.get_default_graph())
+
         init = tf.global_variables_initializer()
         sess.run(init)
 
+        update_iter = 0
         # run
         for epoch in range(config.num_epochs): 
-            print epoch
+            print(epoch)
             sess.run(iterator.initializer)            
 
             while True:
@@ -211,9 +260,18 @@ class SBGAN(object):
                             self.bandwidth: _g_bandwidth})
 
                     _d_bandwidth = sess.run(d_bandwidth)
-                    sess.run(d_train_steps, {\
-                            eps: config.step_size,
-                            self.bandwidth: _d_bandwidth})
+                    if summary and update_iter % config.summary_n == 0:
+                        _summary, _ = sess.run([merged_summary_op, d_train_steps], {\
+                                eps: config.step_size,
+                                self.bandwidth: _d_bandwidth})
+                        summary_writer.add_summary(_summary, update_iter)
+                        summary_writer.flush()
+                    else:
+                        sess.run(d_train_steps, {\
+                                eps: config.step_size,
+                                self.bandwidth: _d_bandwidth})
+
+                    update_iter += 1
 
                 except tf.errors.OutOfRangeError:
                     break

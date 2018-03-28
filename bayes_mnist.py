@@ -24,7 +24,9 @@ class _config(object):
         self.z_std = 1
         self.num_epochs = 100 
         self.prior_std = 1
-        self.step_size = 0.001
+        self.step_size = 0.0001
+        self.summary_savedir = 'summary'
+        self.summary_n = 1
 
 
 def hook_arg_filter(*_args):
@@ -62,10 +64,11 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
 
 def generator(z, scope="generator"):
     with tf.variable_scope(scope):
-        h1 = fc(z, 150, reuse = tf.AUTO_REUSE, scope = "h1")
-        h2 = fc(h1, 300, reuse = tf.AUTO_REUSE, scope = "h2")
-        h3 = fc(h2, 784, activation_fn = None, \
-                reuse = tf.AUTO_REUSE, scope = "h3")
+        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE, 
+                weights_initializer=tf.random_normal_initializer(0, 1)):
+            h1 = fc(z, 150, scope = "h1")
+            h2 = fc(h1, 300, scope = "h2")
+            h3 = fc(h2, 784, activation_fn = None, scope = "h3")
         o = tf.nn.tanh(h3)
             
         return o
@@ -73,13 +76,14 @@ def generator(z, scope="generator"):
 # TODO: dropout
 def discriminator(x, scope="discriminator"):
     with tf.variable_scope(scope):
-        h1 = fc(x, 200, reuse = tf.AUTO_REUSE, scope = "h1")
-        h2 = fc(h1, 150, reuse = tf.AUTO_REUSE, scope = "h2")
-        h3 = fc(h2, 1, activation_fn = None, \
-                reuse = tf.AUTO_REUSE, scope = "h3")
+        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE, 
+                weights_initializer=tf.random_normal_initializer(0, 1)):
+            h1 = fc(x, 200, scope = "h1")
+            h2 = fc(h1, 150, scope = "h2")
+            h3 = fc(h2, 1, activation_fn = None, scope = "h3")
         o = tf.nn.sigmoid(h3)
 
-        return o
+        return o, h3
 
 
 mnist = tf.contrib.learn.datasets.load_dataset("mnist")
@@ -94,4 +98,4 @@ m = SBGAN(generator, discriminator)
 # TODO: cleanup code by placing session creation inside .train()
 sess = tf.Session()
 #sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-m.train(sess, real_data, config, hooks = [hook1])
+m.train(sess, real_data, config, summary=True, hooks = [hook1])
