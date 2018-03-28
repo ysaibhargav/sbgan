@@ -103,20 +103,17 @@ class SBGAN(object):
     def _prior(self,
             params_group,
             config):
-        """ 
-        xavier uniform 
-        """
-        return 0.
-        # uncomment following block for normal distribution
-        """
-        prior_loss = 0
-        for param in params_group:
-            param /= config.prior_std
-            # TODO: why is this reduce_mean in BGAN?
-            prior_loss -= tf.reduce_sum(tf.multiply(param, param))
+        if config.prior == 'xavier':
+            return 0.
 
-        return prior_loss / 2
-        """
+        elif config.prior == 'normal':
+            prior_loss = 0
+            for param in params_group:
+                param /= config.prior_std
+                # TODO: why is this reduce_mean in BGAN?
+                prior_loss -= tf.reduce_sum(tf.multiply(param, param))
+
+            return prior_loss / 2
 
 
     def train(self,
@@ -208,13 +205,28 @@ class SBGAN(object):
         d_train_steps = _flatten(d_train_steps) 
 
         if summary:
-            # TODO: summaries for gradients
-            for i, p in enumerate(prior_g):
-                tf.summary.scalar('prior_g_%i'%i, p)
-            for i, p in enumerate(prior_d):
-                tf.summary.scalar('prior_d_%i'%i, p)
+            for i in range(self.n_g):
+                tf.summary.scalar('prior_g_%i'%i, prior_g[i])
+                tf.summary.scalar('likelihood_g_%i'%i, post_g[i]-prior_g[i])
+                tf.summary.scalar('post_g_%i'%i, post_g[i])
+
+                for j, _var_g in enumerate(var_g[i]):
+                    tf.summary.histogram('generator_%i/phi_star_%s'%(i, _var_g.name), 
+                            g_phi_star[i][j])
+
+            for i in range(self.n_d):
+                tf.summary.scalar('prior_d_%i'%i, prior_d[i])
+                tf.summary.scalar('likelihood_d_%i'%i, post_d[i]-prior_d[i])
+                tf.summary.scalar('post_d_%i'%i, post_d[i])
+                
+                for j, _var_d in enumerate(var_d[i]):
+                    tf.summary.histogram('discriminator_%i/phi_star_%s'%(i, _var_d.name), 
+                            d_phi_star[i][j])
+
             tf.summary.scalar('g_bandwidth', g_bandwidth)
+
             tf.summary.scalar('d_bandwidth', d_bandwidth)
+
             for var in tf.trainable_variables():
                 tf.summary.histogram(var.name, var)
 

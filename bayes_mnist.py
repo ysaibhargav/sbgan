@@ -25,6 +25,7 @@ class _config(object):
         self.num_epochs = 100 
         self.prior_std = 1
         self.step_size = 1e-3 
+        self.prior = 'xavier'
         self.summary_savedir = 'summary'
         self.summary_n = 1
 
@@ -96,4 +97,4 @@ hook1 = Hook(1, show_result)
 m = SBGAN(generator, discriminator)
 sess = tf.Session()
 #sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-m.train(sess, real_data, config, summary=False, hooks = [hook1])
+m.train(sess, real_data, config, summary=True, hooks = [hook1])
