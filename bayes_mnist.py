@@ -24,7 +24,7 @@ class _config(object):
         self.z_std = 1
         self.num_epochs = 100 
         self.prior_std = 1
-        self.step_size = 0.0001
+        self.step_size = 1e-10 
         self.summary_savedir = 'summary'
         self.summary_n = 1
 
@@ -83,7 +83,8 @@ def discriminator(x, scope="discriminator"):
             h3 = fc(h2, 1, activation_fn = None, scope = "h3")
         o = tf.nn.sigmoid(h3)
 
-        return o, h3
+        #return o, h3
+        return h3
 
 
 mnist = tf.contrib.learn.datasets.load_dataset("mnist")
@@ -98,4 +99,4 @@ m = SBGAN(generator, discriminator)
 # TODO: cleanup code by placing session creation inside .train()
 sess = tf.Session()
 #sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-m.train(sess, real_data, config, summary=True, hooks = [hook1])
+m.train(sess, real_data, config, summary=False, hooks = [hook1])

@@ -161,7 +161,7 @@ class SBGAN(object):
                 post_g[i] += tf.reduce_mean(
                         tf.nn.sigmoid_cross_entropy_with_logits(
                             labels=g_labels_real,
-                            logits=discriminators[j](generators[i](z[0][i]))[1])) 
+                            logits=discriminators[j](generators[i](z[0][i])))) 
             post_g[i] *= N
 
         post_d = [0. for _ in range(self.n_d)]
@@ -171,12 +171,12 @@ class SBGAN(object):
             post_d[i] += tf.reduce_mean(
                 tf.nn.sigmoid_cross_entropy_with_logits(
                     labels=d_labels_real,
-                    logits=discriminators[i](x[i])[1]))
+                    logits=discriminators[i](x[i])))
             for j in range(self.n_g):
                 post_d[i] += tf.reduce_mean(
                     tf.nn.sigmoid_cross_entropy_with_logits(
                         labels=d_labels_fake,
-                        logits=discriminators[i](generators[j](z[1][j]))[1]))
+                        logits=discriminators[i](generators[j](z[1][j]))))
             post_d[i] *= N
 
         """

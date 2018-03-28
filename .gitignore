@@ -111,3 +111,5 @@ MNIST-data/
 *tar.gz
 *.swo
 *.swn
+*.swm
+summary/
