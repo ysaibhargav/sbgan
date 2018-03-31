@@ -169,7 +169,6 @@ def generator(z, scope='generator'):
             h1 = fc(z, 10, scope = "h1")
             h2 = fc(h1, 1000, scope = "h2")
             h3 = fc(h2, 100, activation_fn = None, scope = "h3")
-        o = h3 
 
         return h3
 
@@ -180,7 +179,6 @@ def discriminator(z, scope='discriminator'):
             h1 = fc(z, 100, scope = "h1")
             h2 = fc(h1, 1000, scope = "h2")
             h3 = fc(h2, 1, activation_fn = None, scope = "h3")
-        o = h3 
 
         return h3
 
