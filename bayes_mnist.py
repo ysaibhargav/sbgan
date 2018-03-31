@@ -7,16 +7,17 @@ from tensorflow.python import debug as tf_debug
 import tensorflow as tf 
 import numpy as np
 import os
+import pdb
 from skimage.io import imsave
 from collections import namedtuple
 
 from sbgan import SBGAN
 
 fc = tf.contrib.layers.fully_connected
-Hook = namedtuple("Hook", ["n", "f"])
+Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 
 
-class _config(object):
+class Config(object):
     def __init__(self):
         self.x_batch_size = 256
         self.z_batch_size = 256
@@ -91,8 +92,8 @@ def discriminator(x, scope="discriminator"):
 mnist = tf.contrib.learn.datasets.load_dataset("mnist")
 real_data = mnist.train.images
 
-config = _config()
-hook1 = Hook(1, show_result)
+config = Config()
+hook1 = Hook(1, False, show_result)
 
 m = SBGAN(generator, discriminator)
 sess = tf.Session()

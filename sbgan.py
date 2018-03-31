@@ -149,8 +149,8 @@ class SBGAN(object):
         
         # network initialisation
         # initialize points from the prior (page 6, section 5)
-        generators = [self.generator(g_scope+"_%d"%i) for i in range(self.n_g)]
-        discriminators = [self.discriminator(d_scope+"_%d"%i) for i in range(self.n_d)]
+        generators = [self.generator(g_scope+"_%d_"%i) for i in range(self.n_g)]
+        discriminators = [self.discriminator(d_scope+"_%d_"%i) for i in range(self.n_d)]
 
         post_g = [0. for _ in range(self.n_g)]
         g_labels_real = tf.constant(1., shape=(config.z_batch_size, 1))
@@ -177,8 +177,8 @@ class SBGAN(object):
                         logits=discriminators[i](generators[j](z[1][j]))))
             post_d[i] *= N
 
-        var_g = [_get_var(g_scope+"_%d"%i) for i in range(self.n_g)]
-        var_d = [_get_var(d_scope+"_%d"%i) for i in range(self.n_d)]
+        var_g = [_get_var(g_scope+"_%d_"%i) for i in range(self.n_g)]
+        var_d = [_get_var(d_scope+"_%d_"%i) for i in range(self.n_d)]
 
         # priors
         prior_g = [self._prior(_var_g, config) for _var_g in var_g]
@@ -269,10 +269,16 @@ class SBGAN(object):
 
             if hooks != None:
                 for hook in hooks:
-                    if epoch % hook.n == 0:
+                    if epoch % hook.frequency == 0:
                         out = sess.run([generator(z[0][i]) for i, generator in \
                                 enumerate(generators)])
-                        for i, _out in enumerate(out):
-                            hook.f(**{"g_z": _out, 
-                                "epoch": "%d_%d"%(epoch, i)})
+                        if hook.is_joint:
+                            hook.function(**{"g_z": out, 
+                                "real_data": real_data,
+                                "epoch": "%d"%(epoch)})
+                        else:
+                            for i, _out in enumerate(out):
+                                hook.function(**{"g_z": _out, 
+                                    "real_data": real_data,
+                                    "epoch": "%d_%d"%(epoch, i)})
 
