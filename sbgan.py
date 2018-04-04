@@ -115,7 +115,87 @@ class SBGAN(object):
 
             return prior_loss / 2
 
+    def _unsupervised_posterior(self, generators, discriminators, config, x, z, N):
 
+        with tf.name_scope('unsupervised_posterior/gen/'):
+            post_g = [tf.constant(0.) for i in range(self.n_g)]
+            g_labels_real = tf.constant(1., shape = [config.z_batch_size, 1])
+            for i in range(self.n_g):
+                for j in range(self.n_d):
+                    post_g[i] -= tf.reduce_sum(
+                        tf.nn.sigmoid_cross_entropy_with_logits(
+                            labels=g_labels_real,
+                            logits=discriminators[j](generators[i](z[0][i]))
+                        )
+                    )
+                post_g[i] *= N
+        
+        with tf.name_scope('unsupervised_posterior/disc/'):
+            post_d = [tf.constant(0.) for _ in range(self.n_d)]
+            d_labels_real = tf.constant(1., shape=(config.x_batch_size, 1))
+            d_labels_fake = tf.constant(0., shape=(config.z_batch_size, 1))
+            for i in range(self.n_d):
+                post_d[i] -= tf.reduce_sum(
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels=d_labels_real,
+                        logits=discriminators[i](x[i])))
+                for j in range(self.n_g):
+                    post_d[i] -= tf.reduce_sum(
+                        tf.nn.sigmoid_cross_entropy_with_logits(
+                            labels=d_labels_fake,
+                            logits=discriminators[i](generators[j](z[1][j]))
+                        )
+                    )
+                post_d[i] *= N
+        
+        return post_g, post_d
+
+    def _semisupervised_posterior(self, generators, discriminators, config, x, z, xs, ys, N):
+        num_classes = config.num_classes
+        num_supervised = xs.shape[0]
+        with tf.name_scope('semisupervised_posterior/gen/'):
+            post_g = [tf.constant(0.) for _ in range(self.n_g)]
+            g_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * config.z_batch_size)
+            for i in range(self.n_g):
+                for j in range(self.n_d):
+                    post_g[i] -= num_classes * tf.reduce_sum(
+                        tf.nn.softmax_cross_entropy_with_logits(
+                            labels=g_labels_real,
+                            logits=discriminators[j](generators[i](z[0][i]))
+                        )
+                    )
+                post_g[i] *= N
+        
+        with tf.name_scope('semisupervised_posterior/disc/'):
+            post_d = [tf.constant(0.) for _ in range(self.n_d)]
+            d_labels_fake = tf.constant([[1.] + [0.] * num_classes] * config.z_batch_size)
+            d_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * config.x_batch_size)
+            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[num_supervised, 1]), ys])
+            for i in range(self.n_d):
+                post_d[i] -= num_classes * tf.reduce_sum(
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels = d_labels_real,
+                        logits=discriminators[i](x[i])
+                    )
+                )
+                post_d[i] -= tf.reduce_sum(
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels=ys,
+                        logits=discriminators[i](xs)
+                    )
+                )
+                for j in range(self.n_g):
+                    post_d[i] -= tf.reduce_sum(
+                        tf.nn.sigmoid_cross_entropy_with_logits(
+                            labels=d_labels_fake,
+                            logits=discriminators[i](generators[j](z[1][j]))
+                        )
+                    )
+                post_d[i] *= N
+
+        return post_g, post_d
+
+    
     def train(self,
             sess,
             real_data,
@@ -152,30 +232,7 @@ class SBGAN(object):
         generators = [self.generator(g_scope+"_%d_"%i) for i in range(self.n_g)]
         discriminators = [self.discriminator(d_scope+"_%d_"%i) for i in range(self.n_d)]
 
-        post_g = [0. for _ in range(self.n_g)]
-        g_labels_real = tf.constant(1., shape=(config.z_batch_size, 1))
-        for i in range(self.n_g):
-            for j in range(self.n_d):
-                post_g[i] -= tf.reduce_sum(
-                        tf.nn.sigmoid_cross_entropy_with_logits(
-                            labels=g_labels_real,
-                            logits=discriminators[j](generators[i](z[0][i]))))
-            post_g[i] *= N
-
-        post_d = [0. for _ in range(self.n_d)]
-        d_labels_real = tf.constant(1., shape=(config.x_batch_size, 1))
-        d_labels_fake = tf.constant(0., shape=(config.z_batch_size, 1))
-        for i in range(self.n_d):
-            post_d[i] -= tf.reduce_sum(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=d_labels_real,
-                    logits=discriminators[i](x[i])))
-            for j in range(self.n_g):
-                post_d[i] -= tf.reduce_sum(
-                    tf.nn.sigmoid_cross_entropy_with_logits(
-                        labels=d_labels_fake,
-                        logits=discriminators[i](generators[j](z[1][j]))))
-            post_d[i] *= N
+        post_g, post_d = self._unsupervised_posterior(generators, discriminators, config, x, z, N)
 
         var_g = [_get_var(g_scope+"_%d_"%i) for i in range(self.n_g)]
         var_d = [_get_var(d_scope+"_%d_"%i) for i in range(self.n_d)]
