@@ -28,8 +28,51 @@ class Config(object):
         self.step_size = 1e-3 
         self.prior = 'xavier'
         self.summary_savedir = 'summary'
-        self.summary_n = 1
+        self.summary_n = 20
+        self.exp = 'semisupervised'
+        self.n_supervised = 100
+        self.n_g = 5
+        self.n_d = 1
+        self.test_batch_size = 256
+        
 
+class Data(object):
+    def __init__(self):
+        self._x_train = None
+        self._xs_train = None
+        self._ys_train = None
+        self._xs_test = None
+        self._ys_test = None
+
+    def build_graph(self, config):
+        '''
+        Modify this function according to the dataset.
+        Builds the computation graph for the data
+        '''
+        mnist = tf.contrib.learn.datasets.load_dataset("mnist")
+        _x_train = mnist.train.images
+        idx = np.random.choice(_x_train.shape[0], size=config.n_supervised, replace=False)
+        _xs_train = _x_train[idx]
+        _ys_train = mnist.train.labels[idx]
+
+        dataset = tf.data.Dataset.from_tensor_slices(_x_train)
+        dataset = dataset.shuffle(buffer_size=55000).batch(config.x_batch_size)
+        self.unsupervised_iterator = dataset.make_initializable_iterator()
+        self.x = [self.unsupervised_iterator.get_next() for _ in range(config.n_d)]
+        self.z = tf.random.normal([2, config.n_g, config.z_batch_size, config.z_dims], stddev = config.z_std)
+        if config.exp == 'semisupervised':
+            self.n_classes = 10
+            dataset = tf.data.Dataset.from_tensor_slices((_xs_train, _ys_train))
+            dataset = dataset.batch(config.n_supervised)
+            dataset = dataset.map(lambda x, y: (x, tf.one_hot(indices = y, depth = 10)))
+            self.supervised_iterator = dataset.make_initializable_iterator()
+            self.xs, self.ys = self.supervised_iterator.get_next()
+            
+            dataset = tf.data.Dataset.from_tensor_slices((mnist.test.images, mnist.test.labels))
+            dataset = dataset.batch(config.test_batch_size)
+            dataset = dataset.map(lambda x, y: (x, tf.onehot(indices = y, depth = 10)))
+            self.test_iterator = dataset.make_initializable_iterator()
+            self.x_test, self.y_test = self.test_iterator.get_next()
 
 def hook_arg_filter(*_args):
     def hook_decorator(f):
@@ -69,6 +112,7 @@ def generator(z, scope="generator"):
         with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE): 
                 #weights_initializer=tf.random_normal_initializer(0, 1)):
             h1 = fc(z, 150, scope = "h1")
+        
             h2 = fc(h1, 300, scope = "h2")
             h3 = fc(h2, 784, activation_fn = None, scope = "h3")
         o = tf.nn.tanh(h3)
@@ -88,14 +132,13 @@ def discriminator(x, scope="discriminator"):
         #return o, h3
         return h3
 
-
-mnist = tf.contrib.learn.datasets.load_dataset("mnist")
-real_data = mnist.train.images
-
 config = Config()
 hook1 = Hook(1, False, show_result)
 
-m = SBGAN(generator, discriminator)
+data = Data()
+data.build_graph()
+m = SBGAN(generator, discriminator, n_g = config.n_g, n_d = config.n_d)
+
 sess = tf.Session()
 #sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-m.train(sess, real_data, config, summary=True, hooks = [hook1])
+m.train(sess, config, data, summary=True, hooks = None)
