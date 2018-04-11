@@ -1,3 +1,5 @@
+from tensorflow.python import debug as tf_debug
+
 import os 
 import glob
 import numpy as np
@@ -13,20 +15,24 @@ from collections import namedtuple
 
 from sbgan import SBGAN
 
+"""
+Some code borrowed from https://github.com/andrewgordonwilson/bayesgan
+"""
+
 fc = tf.contrib.layers.fully_connected
 Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 
 class Config(object):
     def __init__(self):
-        self.x_batch_size = 256
-        self.z_batch_size = 256
+        self.x_batch_size = 128
+        self.z_batch_size = 128
         self.x_dims = 100
         self.z_dims = 10
         self.z_std = 1
-        self.n_g = 15
+        self.n_g = 10
         self.num_epochs = 100
         self.prior_std = 1
-        self.prior = 'xavier'
+        self.prior = 'normal'
         self.step_size = 1e-3
         self.summary_savedir = 'summary'
         self.summary_n = 1
@@ -164,19 +170,19 @@ def show_result(g_z, X_real, epoch):
 
 def generator(z, scope='generator'):
     with tf.variable_scope(scope):
-        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE):
-                #weights_initializer=tf.random_normal_initializer(0, 1)):
+        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE,#):
+                weights_initializer=tf.random_normal_initializer(0, 1)):
             h1 = fc(z, 10, scope = "h1")
             h2 = fc(h1, 1000, scope = "h2")
             h3 = fc(h2, 100, activation_fn = None, scope = "h3")
 
         return h3
 
-def discriminator(z, scope='discriminator'):
+def discriminator(x, scope='discriminator'):
     with tf.variable_scope(scope):
-        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE):
-                #weights_initializer=tf.random_normal_initializer(0, 1)):
-            h1 = fc(z, 100, scope = "h1")
+        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE,#):
+                weights_initializer=tf.random_normal_initializer(0, 1)):
+            h1 = fc(x, 100, scope = "h1")
             h2 = fc(h1, 1000, scope = "h2")
             h3 = fc(h2, 1, activation_fn = None, scope = "h3")
 
@@ -190,4 +196,5 @@ hook = Hook(1, True, show_result)
 
 m = SBGAN(generator, discriminator, n_g=config.n_g)
 sess = tf.Session()
+#sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 m.train(sess, real_data, config, summary=False, hooks=[hook])

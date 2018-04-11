@@ -77,6 +77,7 @@ class SBGAN(object):
 
         for j in range(num_param):
             phi_star[j] /= len(particles)
+            #phi_star[j] = tf.clip_by_norm(phi_star[j], 10)
 
         return phi_star 
 
@@ -109,9 +110,9 @@ class SBGAN(object):
         elif config.prior == 'normal':
             prior_loss = 0
             for param in params_group:
-                param /= config.prior_std
                 # TODO: why is this reduce_mean in BGAN?
                 prior_loss -= tf.reduce_sum(tf.multiply(param, param))
+            prior_loss /= config.prior_std ** 2
 
             return prior_loss / 2
 
