@@ -5,7 +5,7 @@ import numpy as np
 import pdb
 from functools import partial
 from itertools import combinations
-
+import pdb
 
 class SBGAN(object):
     def __init__(self,
@@ -82,8 +82,7 @@ class SBGAN(object):
 
 
     def _prior(self,
-            params_group,
-            config):
+            params_group, config):
         if config.prior == 'xavier':
             return 0.
 
@@ -150,7 +149,7 @@ class SBGAN(object):
             post_d = [0. for _ in range(self.n_d)]
             d_labels_fake = tf.constant([[1.] + [0.] * num_classes] * config.z_batch_size)
             d_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * config.x_batch_size)
-            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.n_supervised_samples, 1]), data.ys], axis=1)
+            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.n_supervised, 1]), data.ys], axis=1)
             for i in range(self.n_d):
                 post_d[i] -= num_classes * tf.reduce_sum(
                     tf.nn.sigmoid_cross_entropy_with_logits(
@@ -160,7 +159,7 @@ class SBGAN(object):
                 )
                 post_d[i] -= tf.reduce_sum(
                     tf.nn.sigmoid_cross_entropy_with_logits(
-                        labels=ys,
+                        labels=d_labels_classes,
                         logits=discriminators[i](data.xs)
                     )
                 )
@@ -204,7 +203,7 @@ class SBGAN(object):
         def _flatten(main_list):
             return [item for sub_list in main_list for item in sub_list]
 
-        data, iterator = self._data_handler(config, real_data)
+        #data, iterator = self._data_handler(config, real_data)
         eps = tf.placeholder(dtype=tf.float32)
         
         # network initialisation
@@ -285,7 +284,7 @@ class SBGAN(object):
 
             while True:
                 if config.exp == 'semisupervised':
-                    sess.run(data.semisupervised_iterator.initializer)
+                    sess.run(data.supervised_iterator.initializer)
                 try:
                     _g_bandwidth = sess.run(g_bandwidth)
                     sess.run(g_train_steps, {\
@@ -310,21 +309,23 @@ class SBGAN(object):
                     break
 
             if hooks != None:
+
                 for hook in hooks:
                     if epoch % hook.frequency == 0:
-                        out = sess.run([generator(z[0][i]) for i, generator in \
+                        out = sess.run([generator(data.z[0][i]) for i, generator in \
                                 enumerate(generators)])
+                        self.test(sess, data, d_scope='discriminator')
+
                         if hook.is_joint:
                             hook.function(**{"g_z": out, 
                                 "real_data": real_data,
                                 "epoch": "%d"%(epoch)})
                         else:
                             for i, _out in enumerate(out):
-                                hook.function(**{"g_z": _out, 
-                                    "real_data": real_data,
+                                hook.function(**{"g_z": _out,
                                     "epoch": "%d_%d"%(epoch, i)})
 
-    def test(self, sess, config, data, d_scope='discriminator', summary=False, hooks=None):
+    def test(self, sess, data, d_scope='discriminator'):
         '''
         testing graph and loop
         '''
@@ -336,12 +337,12 @@ class SBGAN(object):
             '''
             p += tf.nn.softmax(
                 logits = discriminators[i](data.x_test)[:, 1:],
-                axis=-1
+                dim=-1
             )
         p /= self.n_d
         predictions = tf.argmax(p, axis = 1)
         actual = tf.argmax(data.y_test, axis = 1)
-        correct = tf.reduce_sum(tf.cast(tf.equal(predictions, actual)))
+        correct = tf.reduce_sum(tf.cast(tf.equal(predictions, actual), dtype=tf.float32))
         total_samples = 0
         total_correct = 0
         sess.run(data.test_iterator.initializer)
@@ -353,7 +354,8 @@ class SBGAN(object):
 
             except tf.errors.OutOfRangeError:
                 break
-        print('Test Accuracy: %.2f' % 100. * total_correct / total_samples)
+        #pdb.set_trace()
+        print('Test Accuracy: %.2f' % (100. * total_correct / total_samples))
 
 
         
