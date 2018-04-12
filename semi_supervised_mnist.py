@@ -12,8 +12,7 @@ from skimage.io import imsave
 from collections import namedtuple
 from collections import OrderedDict, defaultdict
 from dcgan_ops import *
-#from bgan_util import AttributeDict
-from utils import AttributeDict, read_from_yaml
+from utils import AttributeDict, read_from_yaml, setup_output_dir
 from sbgan import SBGAN
 
 fc = tf.contrib.layers.fully_connected
@@ -24,11 +23,13 @@ config = None
 def parse_arguments():
 	parser = argparse.ArgumentParser(description='SBGAN Argument Parser')
 	parser.add_argument('-cf', '--config_file',dest='config_file', type=str)
+	parser.add_argument('-l', '--log', action="store", dest="loglevel", type = str, default="DEBUG", help = "Logging Level")
 	return parser.parse_args()
 
 class Config(object):
 	def __init__(self):
 		config = read_from_yaml(file)
+		output_dir, config = setup_output_dir(config['output_dir'], config, loglevel)	
 		for k in config:
 			setattr(self, k, config[k])
 		self.x_batch_size = 200
@@ -182,25 +183,25 @@ def DCGANdiscriminator(z, scope='discriminator', train=True):
 	def DCGANgenerator(z, scope='generator'):
 		#z: [?, 100]
 		gen_strides = [2, 2, 2, 2]
-		gen_kernel_sizes = [5, 3, 3, 3, 3]
-		gen_weight_dims = OrderedDict([('g_h4_W', (5, 5, 1, 96)), ('g_h3_W', (3, 3, 96, 192)), ('g_h2_W', (3, 3, 192, 384)), \
+		g_kernel_dim = [5, 3, 3, 3, 3]
+		g_w_dim = OrderedDict([('g_h4_W', (5, 5, 1, 96)), ('g_h3_W', (3, 3, 96, 192)), ('g_h2_W', (3, 3, 192, 384)), \
 										('g_h1_W', (3, 3, 384, 512)), ('g_h0_lin_W', (100, 2048))])
 		batch_size = config.z_batch_size
-		gen_output_dims = OrderedDict([('g_h4_out', (28, 28)), ('g_h3_out', (14, 14)), ('g_h2_out', (7, 7)), ('g_h1_out', (4, 4)), ('g_h0_out', (2, 2))])
+		g_out_dim = OrderedDict([('g_h4', (28, 28)), ('g_h3', (14, 14)), ('g_h2', (7, 7)), ('g_h1', (4, 4)), ('g_h0', (2, 2))])
 
 		with tf.variable_scope(scope) as scope:
-			self.g_batch_norm = AttributeDict([("g_bn%i" % gbn_i, batch_norm(name='g_bn%i' % gbn_i)) for gbn_i in range(len(gen_strides))])
-			h = linear(z, gen_weight_dims["g_h0_lin_W"][-1], 'g_h0_lin')
+			g_batch_norm = AttributeDict([("g_bn%i" % gbn_i, batch_norm(name='g_bn%i' % gbn_i)) for gbn_i in range(len(gen_strides))])
+			h = linear(z, g_w_dim["g_h0_lin_W"][-1], 'g_h0_lin')
 			h = tf.nn.relu(g_batch_norm.g_bn0(h))
-			h = tf.reshape(h, [batch_size, gen_output_dims["g_h0_out"][0], gen_output_dims["g_h0_out"][1], -1])
+			h = tf.reshape(h, [batch_size, g_out_dim["g_h0"][0], g_out_dim["g_h0"][1], -1])
 
 			for layer in range(1, len(gen_strides)+1):
-				out_shape = [batch_size, gen_output_dims["g_h%i_out" % layer][0],
-							 gen_output_dims["g_h%i_out" % layer][1], gen_weight_dims["g_h%i_W" % layer][-2]]
+				out_shape = [batch_size, g_out_dim["g_h%i_out" % layer][0],
+							 g_out_dim["g_h%i_out" % layer][1], g_w_dim["g_h%i_W" % layer][-2]]
 
 				h = deconv2d(h,
 							 out_shape,
-							 k_h=gen_kernel_sizes[layer-1], k_w=gen_kernel_sizes[layer-1],
+							 k_h=g_kernel_dim[layer-1], k_w=g_kernel_dim[layer-1],
 							 d_h=gen_strides[layer-1], d_w=gen_strides[layer-1],
 							 name='g_h%i' % layer)
 				if layer < len(gen_strides):
@@ -208,7 +209,7 @@ def DCGANdiscriminator(z, scope='discriminator', train=True):
 		return tf.nn.tanh(h) 
 
 args = parse_arguments()
-config = Config(args.config_file)
+config = Config(args.config_file, args.loglevel)
 hook1 = Hook(1, False, show_result)
 
 data = Data()
@@ -216,7 +217,6 @@ data.build_graph(config)
 m = SBGAN(generator, discriminator, n_g = config.n_g, n_d = config.n_d)
 
 sess = tf.Session(config=tf.ConfigProto(gpu_options = tf.GPUOptions(allow_growth=True)))
-#sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 m.train(sess, config, data, summary=False, hooks = [hook1])
 
 

@@ -6,6 +6,7 @@ import pdb
 from functools import partial
 from itertools import combinations
 import pdb
+import logging
 
 
 
@@ -365,7 +366,8 @@ class SBGAN(object):
             except tf.errors.OutOfRangeError:
                 break
         #pdb.set_trace()
-        print('Test Accuracy: %.2f' % (100. * total_correct / total_samples))
+        logger = logging.getLogger()
+        logger.info('Test Accuracy: %.2f' % (100. * total_correct / total_samples))
 
 
         
