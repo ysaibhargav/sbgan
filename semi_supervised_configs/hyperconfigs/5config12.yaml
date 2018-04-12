@@ -1,0 +1,16 @@
+exp: semisupervised
+z_std: 1
+n_g: 5
+summary_savedir: summary
+summary_n: 20
+prior: normal
+z_dims: 100
+n_supervised: 100
+x_batch_size: 200
+z_batch_size: 200
+output_dir: ./ss-mnist-exp
+step_size: 0.001
+prior_std: 1
+num_epochs: 100
+test_batch_size: 200
+n_d: 1
