@@ -3,7 +3,7 @@
 #  install of open-source TensorFlow.)
 from tensorflow.python import debug as tf_debug
 
-
+import argparse
 import tensorflow as tf 
 import numpy as np
 import os
@@ -27,26 +27,11 @@ def parse_arguments():
 	return parser.parse_args()
 
 class Config(object):
-	def __init__(self):
+	def __init__(self, file, loglevel):
 		config = read_from_yaml(file)
 		output_dir, config = setup_output_dir(config['output_dir'], config, loglevel)	
 		for k in config:
 			setattr(self, k, config[k])
-		self.x_batch_size = 200
-		self.z_batch_size = 200
-		self.z_dims = 100
-		self.z_std = 1
-		self.num_epochs = 100 
-		self.prior_std = 1
-		self.step_size = 1e-3 
-		self.prior = 'normal'
-		self.summary_savedir = 'summary'
-		self.summary_n = 20
-		self.exp = 'semisupervised'
-		self.n_supervised = 100
-		self.n_g = 5
-		self.n_d = 1
-		self.test_batch_size = 200
 		
 
 class Data(object):

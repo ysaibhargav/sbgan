@@ -20,6 +20,25 @@ class AttributeDict(dict):
 	def __hash__(self):
 		return hash(tuple(sorted(self.items())))
 
+def make_if_not_exists(dir):
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+
+def make_directory(dirname):
+    """
+    Makes a directory if it does not exist
+    """
+    try:
+        os.makedirs(dirname)
+    except OSError:
+        if not os.path.isdir(dirname):
+            raise
+
+def write_to_yaml(filepath, data):
+    with open(filepath, 'w') as fd:
+        yaml.dump(data=data, stream=fd, default_flow_style=False)
+
+
 def setup_output_dir(output_dir, config, loglevel):
     """
         Takes in the output_dir. Note that the output_dir stores each run as run-1, ....
