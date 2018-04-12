@@ -214,6 +214,6 @@ data = Data()
 data.build_graph(config)
 m = SBGAN(generator, discriminator, n_g = config.n_g, n_d = config.n_d)
 
-sess = tf.Session()
+sess = tf.Session(config=tf.ConfigProto(gpu_options = tf.GPUOptions(allow_growth=True)))
 #sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 m.train(sess, config, data, summary=False, hooks = [hook1])
