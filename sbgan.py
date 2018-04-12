@@ -5,6 +5,8 @@ import numpy as np
 import pdb
 from functools import partial
 from itertools import combinations
+import pdb
+
 
 
 class SBGAN(object):
@@ -82,28 +84,8 @@ class SBGAN(object):
         return phi_star 
 
 
-    def _data_handler(self,
-            config,
-            real_data):
-        round_sz = config.x_batch_size*(real_data.shape[0]\
-                    //config.x_batch_size)
-        real_data = real_data[:round_sz]
-
-        dataset = tf.data.Dataset.from_tensor_slices((real_data))
-        dataset = dataset.shuffle(buffer_size=10000)
-        dataset = dataset.batch(config.x_batch_size)
-        iterator = dataset.make_initializable_iterator()
-
-        x = [iterator.get_next() for _ in range(self.n_d)]
-        z = tf.random_normal([2, self.n_g, config.z_batch_size, \
-                config.z_dims], stddev = config.z_std)
-
-        return x, z, iterator
-
-
     def _prior(self,
-            params_group,
-            config):
+            params_group, config):
         if config.prior == 'xavier':
             return 0.
 
@@ -111,16 +93,100 @@ class SBGAN(object):
             prior_loss = 0
             for param in params_group:
                 # TODO: why is this reduce_mean in BGAN?
-                prior_loss -= tf.reduce_sum(tf.multiply(param, param))
+                prior_loss -= tf.reduce_mean(tf.multiply(param, param))
             prior_loss /= config.prior_std ** 2
 
             return prior_loss / 2
 
+    def _unsupervised_posterior(self, generators, discriminators, data, config, N):
 
+        with tf.name_scope('unsupervised_posterior/gen/'):
+            post_g = [0. for _ in range(self.n_g)]
+            g_labels_real = tf.constant(1., shape = [config.z_batch_size, 1])
+            for i in range(self.n_g):
+                for j in range(self.n_d):
+                    post_g[i] -= tf.reduce_sum(
+                        tf.nn.sigmoid_cross_entropy_with_logits(
+                            labels=g_labels_real,
+                            logits=discriminators[j](generators[i](data.z[0][i]))
+                        )
+                    )
+                post_g[i] *= N
+        
+        with tf.name_scope('unsupervised_posterior/disc/'):
+            post_d = [0. for _ in range(self.n_d)]
+            d_labels_real = tf.constant(1., shape=(config.x_batch_size, 1))
+            d_labels_fake = tf.constant(0., shape=(config.z_batch_size, 1))
+            for i in range(self.n_d):
+                post_d[i] -= tf.reduce_sum(
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels=d_labels_real,
+                        logits=discriminators[i](data.x[i])))
+                for j in range(self.n_g):
+                    post_d[i] -= tf.reduce_sum(
+                        tf.nn.sigmoid_cross_entropy_with_logits(
+                            labels=d_labels_fake,
+                            logits=discriminators[i](generators[j](data.z[1][j]))
+                        )
+                    )
+                post_d[i] *= N
+        
+        return post_g, post_d
+
+    def _semisupervised_posterior(self, generators, discriminators, data, config, N):
+        num_classes = data.n_classes
+        with tf.name_scope('semisupervised_posterior/gen/'):
+            post_g = [0. for _ in range(self.n_g)]
+            g_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * config.z_batch_size)
+            for i in range(self.n_g):
+                for j in range(self.n_d):
+
+                    logits = discriminators[j](generators[i](data.z[0][i]))
+
+                    prob_except_fake = tf.reduce_logsumexp(logits[:, 1:], axis = 1)
+                    prob = tf.reduce_logsumexp(logits, axis = 1)
+                    post_g[i] += tf.reduce_mean(prob_except_fake - prob)
+
+                post_g[i] *= N
+        
+        with tf.name_scope('semisupervised_posterior/disc/'):
+            post_d = [0. for _ in range(self.n_d)]
+            d_labels_fake = tf.constant([[1.] + [0.] * num_classes] * config.z_batch_size)
+            d_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * config.x_batch_size)
+            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.n_supervised, 1]), data.ys], axis=1)
+            for i in range(self.n_d):
+                'real samples'
+
+                logits = discriminators[i](data.x[i])
+                prob_except_fake = tf.reduce_logsumexp(logits[:, 1:], axis = 1)
+                prob = tf.reduce_logsumexp(logits, axis = 1)
+                post_d[i] += tf.reduce_mean(prob_except_fake - prob)
+
+                'semi supervised'
+                post_d[i] -= tf.reduce_sum(
+                    tf.nn.softmax_cross_entropy_with_logits(
+                        labels=d_labels_classes,
+                        logits=discriminators[i](data.xs)
+                    )
+                )
+                
+                'generated samples'
+                for j in range(self.n_g):
+                    post_d[i] -= tf.reduce_sum(
+                        tf.nn.softmax_cross_entropy_with_logits(
+                            labels=d_labels_fake,
+                            logits=discriminators[i](generators[j](data.z[1][j]))
+                        )
+                    )
+                post_d[i] *= N
+
+        return post_g, post_d
+
+    
     def train(self,
             sess,
-            real_data,
             config,
+            data,
             g_scope="generator",
             d_scope="discriminator",
             summary=False,
@@ -145,7 +211,7 @@ class SBGAN(object):
         def _flatten(main_list):
             return [item for sub_list in main_list for item in sub_list]
 
-        x, z, iterator = self._data_handler(config, real_data)
+        #data, iterator = self._data_handler(config, real_data)
         eps = tf.placeholder(dtype=tf.float32)
         
         # network initialisation
@@ -153,51 +219,11 @@ class SBGAN(object):
         generators = [self.generator(g_scope+"_%d_"%i) for i in range(self.n_g)]
         discriminators = [self.discriminator(d_scope+"_%d_"%i) for i in range(self.n_d)]
 
-        post_g = [0. for _ in range(self.n_g)]
-        g_labels_real = tf.constant(1., shape=(config.z_batch_size, 1))
-        for i in range(self.n_g):
-            #post_g_i = []
-            for j in range(self.n_d):
-                """
-                post_g_i.append(tf.reduce_sum(
-                        tf.nn.sigmoid_cross_entropy_with_logits(
-                            labels=g_labels_real,
-                            logits=discriminators[j](generators[i](z[0][i])))))
-                """
-                post_g[i] -= tf.reduce_sum(
-                        tf.nn.sigmoid_cross_entropy_with_logits(
-                            labels=g_labels_real,
-                            logits=discriminators[j](generators[i](z[0][i]))))
-            #post_g[i] = -tf.reduce_logsumexp(tf.stack(post_g_i, axis=0))
-            post_g[i] *= N
-
-        post_d = [0. for _ in range(self.n_d)]
-        d_labels_real = tf.constant(1., shape=(config.x_batch_size, 1))
-        d_labels_fake = tf.constant(0., shape=(config.z_batch_size, 1))
-        for i in range(self.n_d):
-            post_d[i] -= tf.reduce_sum(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=d_labels_real,
-                    logits=discriminators[i](x[i])))
-            for j in range(self.n_g):
-                post_d[i] -= tf.reduce_sum(
-                    tf.nn.sigmoid_cross_entropy_with_logits(
-                        labels=d_labels_fake,
-                        logits=discriminators[i](generators[j](z[1][j]))))
-            """
-            post_d_i = [tf.reduce_sum(
-                tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=d_labels_real,
-                    logits=discriminators[i](x[i])))]
-            for j in range(self.n_g):
-                post_d_i.append(tf.reduce_sum(
-                    tf.nn.sigmoid_cross_entropy_with_logits(
-                        labels=d_labels_fake,
-                        logits=discriminators[i](generators[j](z[1][j])))))
-            post_d[i] = -tf.reduce_logsumexp(tf.stack(post_d_i, axis=0))
-            """
-            post_d[i] *= N
-
+        if config.exp == 'unsupervised':
+            post_g, post_d = self._unsupervised_posterior(generators, discriminators, data, config, N)
+        elif config.exp == 'semisupervised':
+            post_g, post_d = self._semisupervised_posterior(generators, discriminators, data, config, N)
+        
         var_g = [_get_var(g_scope+"_%d_"%i) for i in range(self.n_g)]
         var_d = [_get_var(d_scope+"_%d_"%i) for i in range(self.n_d)]
 
@@ -262,10 +288,12 @@ class SBGAN(object):
         # run
         for epoch in range(config.num_epochs): 
             print(epoch)
-            sess.run(iterator.initializer)            
+            sess.run(data.unsupervised_iterator.initializer)            
 
             # TODO: multiple opt steps 
             while True:
+                if config.exp == 'semisupervised':
+                    sess.run(data.supervised_iterator.initializer)
                 try:
                     _g_bandwidth = sess.run(g_bandwidth)
                     sess.run(g_train_steps, {\
@@ -290,17 +318,54 @@ class SBGAN(object):
                     break
 
             if hooks != None:
+
                 for hook in hooks:
                     if epoch % hook.frequency == 0:
-                        out = sess.run([generator(z[0][i]) for i, generator in \
+                        out = sess.run([generator(data.z[0][i]) for i, generator in \
                                 enumerate(generators)])
+                        if config.exp == 'semisupervised':
+                            self.test(sess, data, d_scope='discriminator')
+
                         if hook.is_joint:
                             hook.function(**{"g_z": out, 
                                 "real_data": real_data,
                                 "epoch": "%d"%(epoch)})
                         else:
                             for i, _out in enumerate(out):
-                                hook.function(**{"g_z": _out, 
-                                    "real_data": real_data,
+                                hook.function(**{"g_z": _out,
                                     "epoch": "%d_%d"%(epoch, i)})
 
+    def test(self, sess, data, d_scope='discriminator'):
+        '''
+        testing graph and loop
+        '''
+        discriminators = [self.discriminator(d_scope+"_%d_"%i) for i in range(self.n_d)]    
+        p = 0.
+        for i in range(self.n_d):
+            '''
+            compute predictions from 1 discriminator
+            '''
+            p += tf.nn.softmax(
+                logits = discriminators[i](data.x_test)[:, 1:],
+                dim=-1
+            )
+        p /= self.n_d
+        predictions = tf.argmax(p, axis = 1)
+        actual = tf.argmax(data.y_test, axis = 1)
+        correct = tf.reduce_sum(tf.cast(tf.equal(predictions, actual), dtype=tf.float32))
+        total_samples = 0
+        total_correct = 0
+        sess.run(data.test_iterator.initializer)
+        while True:
+            try:
+                x, num_correct = sess.run([data.x_test, correct])
+                total_samples += x.shape[0]
+                total_correct +=  num_correct
+
+            except tf.errors.OutOfRangeError:
+                break
+        #pdb.set_trace()
+        print('Test Accuracy: %.2f' % (100. * total_correct / total_samples))
+
+
+        
