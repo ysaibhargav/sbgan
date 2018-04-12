@@ -14,7 +14,7 @@ from collections import OrderedDict, defaultdict
 from dcgan_ops import *
 from utils import AttributeDict, read_from_yaml, setup_output_dir
 from sbgan import SBGAN
-
+import pdb
 fc = tf.contrib.layers.fully_connected
 Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 
@@ -32,7 +32,7 @@ class Config(object):
 		output_dir, config = setup_output_dir(config['output_dir'], config, loglevel)	
 		for k in config:
 			setattr(self, k, config[k])
-		
+		setattr(self, 'output_dir', output_dir)	
 
 class Data(object):
 	def __init__(self):
@@ -113,7 +113,8 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
 		if not os.path.exists(folder_path):
 				os.makedirs(folder_path)
 		file_path = os.path.join(folder_path, "%s.png"%str(fname))
-	imsave(os.path.join(file_path, img_grid)
+	#pdb.set_trace()
+	imsave(file_path, img_grid)
 
 
 def generator(z, scope="generator"):
