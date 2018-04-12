@@ -20,15 +20,15 @@ Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 
 class Config(object):
     def __init__(self):
-        self.x_batch_size = 256
-        self.z_batch_size = 256
+        self.x_batch_size = 128
+        self.z_batch_size = 128
         self.z_dims = 100
         self.z_std = 1
         self.n_g = 10
         self.num_epochs = 100 
         self.prior_std = 1
-        self.step_size = 1e-3 
-        self.prior = 'xavier'
+        self.step_size = 5e-4 
+        self.prior = 'normal'
         self.summary_savedir = 'summary'
         self.summary_n = 1
 

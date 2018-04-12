@@ -156,11 +156,19 @@ class SBGAN(object):
         post_g = [0. for _ in range(self.n_g)]
         g_labels_real = tf.constant(1., shape=(config.z_batch_size, 1))
         for i in range(self.n_g):
+            #post_g_i = []
             for j in range(self.n_d):
+                """
+                post_g_i.append(tf.reduce_sum(
+                        tf.nn.sigmoid_cross_entropy_with_logits(
+                            labels=g_labels_real,
+                            logits=discriminators[j](generators[i](z[0][i])))))
+                """
                 post_g[i] -= tf.reduce_sum(
                         tf.nn.sigmoid_cross_entropy_with_logits(
                             labels=g_labels_real,
                             logits=discriminators[j](generators[i](z[0][i]))))
+            #post_g[i] = -tf.reduce_logsumexp(tf.stack(post_g_i, axis=0))
             post_g[i] *= N
 
         post_d = [0. for _ in range(self.n_d)]
@@ -176,6 +184,18 @@ class SBGAN(object):
                     tf.nn.sigmoid_cross_entropy_with_logits(
                         labels=d_labels_fake,
                         logits=discriminators[i](generators[j](z[1][j]))))
+            """
+            post_d_i = [tf.reduce_sum(
+                tf.nn.sigmoid_cross_entropy_with_logits(
+                    labels=d_labels_real,
+                    logits=discriminators[i](x[i])))]
+            for j in range(self.n_g):
+                post_d_i.append(tf.reduce_sum(
+                    tf.nn.sigmoid_cross_entropy_with_logits(
+                        labels=d_labels_fake,
+                        logits=discriminators[i](generators[j](z[1][j])))))
+            post_d[i] = -tf.reduce_logsumexp(tf.stack(post_d_i, axis=0))
+            """
             post_d[i] *= N
 
         var_g = [_get_var(g_scope+"_%d_"%i) for i in range(self.n_g)]
@@ -244,6 +264,7 @@ class SBGAN(object):
             print(epoch)
             sess.run(iterator.initializer)            
 
+            # TODO: multiple opt steps 
             while True:
                 try:
                     _g_bandwidth = sess.run(g_bandwidth)

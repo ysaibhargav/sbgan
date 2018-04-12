@@ -26,9 +26,9 @@ class Config(object):
         self.z_std = 1
         self.n_g = 10
         self.num_epochs = 100 
-        self.prior_std = 1
+        self.prior_std = 3
         self.step_size = 1e-3 
-        self.prior = 'xavier'
+        self.prior = 'normal'
         self.summary_savedir = 'summary'
         self.summary_n = 1
 
@@ -70,8 +70,8 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
 
 def generator(z, scope="generator"):
     with tf.variable_scope(scope):
-        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE): 
-                #weights_initializer=tf.random_normal_initializer(0, 1)):
+        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE, 
+                weights_initializer=tf.random_normal_initializer(0, 1)):
             h1 = fc(z, 150, scope = "h1")
             h2 = fc(h1, 300, scope = "h2")
             h3 = fc(h2, 784, activation_fn = None, scope = "h3")
@@ -82,8 +82,8 @@ def generator(z, scope="generator"):
 # TODO: dropout
 def discriminator(x, scope="discriminator"):
     with tf.variable_scope(scope):
-        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE): 
-                #weights_initializer=tf.random_normal_initializer(0, 1)):
+        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE, 
+                weights_initializer=tf.random_normal_initializer(0, 1)):
             h1 = fc(x, 200, scope = "h1")
             h2 = fc(h1, 150, scope = "h2")
             h3 = fc(h2, 1, activation_fn = None, scope = "h3")
