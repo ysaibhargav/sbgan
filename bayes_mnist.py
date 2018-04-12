@@ -11,7 +11,7 @@ import pdb
 from skimage.io import imsave
 from collections import namedtuple
 from collections import OrderedDict, defaultdict
-#from dcgan_ops import *
+from dcgan_ops import *
 #from bgan_util import AttributeDict
 
 from sbgan import SBGAN
@@ -20,6 +20,14 @@ fc = tf.contrib.layers.fully_connected
 Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 
 config = None
+
+class AttributeDict(dict):
+	def __getattr__(self, attr):
+		return self[attr]
+	def __setattr__(self, attr, value):
+		self[attr] = value
+	def __hash__(self):
+		return hash(tuple(sorted(self.items())))
 
 class Config(object):
 	def __init__(self):
@@ -142,190 +150,63 @@ def discriminator(z, scope='discriminator'):
 		return h3
 
 #class and helper functions for DCGAN
-'''
-class DCGAN(object):
-	def __init__(self, x_dim, z_dim, dataset_size, batch_size=64, gf_dim=64, df_dim=64, num_layers=4):
-		assert len(x_dim) == 3, "invalid image dims"
-		c_dim = x_dim[2]
-		self.is_grayscale = (c_dim == 1)
-		self.dataset_size = dataset_size
-		self.batch_size = batch_size
-		
-		self.K = 2 # fake and real classes
-		self.x_dim = x_dim
-		self.z_dim = z_dim
+def DCGANdiscriminator(z, scope='discriminator', train=True):
 
-		self.gf_dim = gf_dim
-		self.df_dim = df_dim
-		self.c_dim = c_dim
+	K = 11
+	# z: [?, 28, 28, 1]
+	disc_strides = [2, 2, 2, 2]
+	disc_kernel_sizes = [5, 3, 3, 3, 3]
+	batch_size = config.x_batch_size
+	df_dim = 96
+	output_kernels = [96, 192, 384, 512]
 
-		def get_strides(num_layers, num_pool):
-			interval = int(math.floor(num_layers/float(num_pool)))
-			strides = np.array([1]*num_layers)
-			strides[0:interval*num_pool:interval] = 2
-			return strides
-		
-		self.num_pool = 4
-		self.max_num_dfs = 512
-		self.gen_strides = get_strides(num_layers, self.num_pool)
-		self.disc_strides = self.gen_strides
-		num_dfs = np.cumprod(np.array([self.df_dim] + list(self.disc_strides)))[:-1]
-		num_dfs[num_dfs >= self.max_num_dfs] = self.max_num_dfs # memory
-		self.num_dfs = list(num_dfs)
-		self.num_gfs = self.num_dfs[::-1]
-
-		self.construct_from_hypers(gen_strides=self.gen_strides, disc_strides=self.disc_strides,
-								   num_gfs=self.num_gfs, num_dfs=self.num_dfs)
-		
-		self.build_bgan_graph()
-
-	def construct_from_hypers(self, gen_kernel_size=5, gen_strides=[2,2,2,2],
-							  disc_kernel_size=5, disc_strides=[2,2,2,2],
-							  num_dfs=None, num_gfs=None):
-
-		
-		self.d_batch_norm = AttributeDict([("d_bn%i" % dbn_i, batch_norm(name='d_bn%i' % dbn_i)) for dbn_i in range(len(disc_strides))])
-		self.sup_d_batch_norm = AttributeDict([("sd_bn%i" % dbn_i, batch_norm(name='sup_d_bn%i' % dbn_i)) for dbn_i in range(5)])
-		self.g_batch_norm = AttributeDict([("g_bn%i" % gbn_i, batch_norm(name='g_bn%i' % gbn_i)) for gbn_i in range(len(gen_strides))])
-
-		if num_dfs is None:
-			num_dfs = [self.df_dim, self.df_dim*2, self.df_dim*4, self.df_dim*8]
-			
-		if num_gfs is None:
-			num_gfs = [self.gf_dim*8, self.gf_dim*4, self.gf_dim*2, self.gf_dim]
-
-		assert len(gen_strides) == len(num_gfs), "invalid hypers!"
-		assert len(disc_strides) == len(num_dfs), "invalid hypers!"
-
-		s_h, s_w = self.x_dim[0], self.x_dim[1]
-		ks = gen_kernel_size
-		self.gen_output_dims = OrderedDict()
-		self.gen_weight_dims = OrderedDict()
-		num_gfs = num_gfs + [self.c_dim]
-		self.gen_kernel_sizes = [ks]
-		for layer in range(len(gen_strides))[::-1]:
-			self.gen_output_dims["g_h%i_out" % (layer+1)] = (s_h, s_w)
-			assert gen_strides[layer] <= 2, "invalid stride"
-			assert ks % 2 == 1, "invalid kernel size"
-			self.gen_weight_dims["g_h%i_W" % (layer+1)] = (ks, ks, num_gfs[layer+1], num_gfs[layer])
-			self.gen_weight_dims["g_h%i_b" % (layer+1)] = (num_gfs[layer+1],)
-			s_h, s_w = conv_out_size(s_h, gen_strides[layer]), conv_out_size(s_w, gen_strides[layer])
-			ks = kernel_sizer(ks, gen_strides[layer])
-			self.gen_kernel_sizes.append(ks)
-		self.gen_weight_dims.update(OrderedDict([("g_h0_lin_W", (self.z_dim, num_gfs[0] * s_h * s_w)),
-												 ("g_h0_lin_b", (num_gfs[0] * s_h * s_w,))]))
-		self.gen_output_dims["g_h0_out"] = (s_h, s_w)
-
-		self.disc_weight_dims = OrderedDict()
-		s_h, s_w = self.x_dim[0], self.x_dim[1]
-		num_dfs = [self.c_dim] + num_dfs
-		ks = disc_kernel_size
-		self.disc_kernel_sizes = [ks]
+	with tf.variable_scope(scope) as scope:
+		d_batch_norm = AttributeDict([("d_bn%i" % dbn_i, batch_norm(name='d_bn%i' % dbn_i)) for dbn_i in range(len(disc_strides))])
+		h = z
 		for layer in range(len(disc_strides)):
-			assert disc_strides[layer] <= 2, "invalid stride"
-			assert ks % 2 == 1, "invalid kernel size"
-			self.disc_weight_dims["d_h%i_W" % layer] = (ks, ks, num_dfs[layer], num_dfs[layer+1])
-			self.disc_weight_dims["d_h%i_b" % layer] = (num_dfs[layer+1],)
-			s_h, s_w = conv_out_size(s_h, disc_strides[layer]), conv_out_size(s_w, disc_strides[layer])
-			ks = kernel_sizer(ks, disc_strides[layer])
-			self.disc_kernel_sizes.append(ks)
+			if layer == 0:
+				h = lrelu(conv2d(h, output_kernels[layer], name='d_h%i_conv' % layer, \
+							k_h=disc_kernel_sizes[layer], k_w=disc_kernel_sizes[layer], \
+							d_h=disc_strides[layer], d_w=disc_strides[layer],
+							))
+			else:
+				h = lrelu(d_batch_norm["d_bn%i" % layer](conv2d(h, output_kernels[layer], \
+															name='d_h%i_conv' % layer, k_h=disc_kernel_sizes[layer], k_w=disc_kernel_sizes[layer], \
+															d_h=disc_strides[layer], d_w=disc_strides[layer]), train=train))
 
-		self.disc_weight_dims.update(OrderedDict([("d_h_end_lin_W", (num_dfs[-1] * s_h * s_w, num_dfs[-1])),
-												  ("d_h_end_lin_b", (num_dfs[-1],)),
-												  ("d_h_out_lin_W", (num_dfs[-1], self.K)),
-												  ("d_h_out_lin_b", (self.K,))]))
+		h_end = lrelu(linear(tf.reshape(h, [batch_size, -1]), df_dim*4, "d_h_end_lin")) # for feature norm
+		h_out = linear(h_end, K, 'd_h_out_lin')
+	return h_out
 
 
-		for k, v in self.gen_output_dims.items():
-			print "%s: %s" % (k, v)
-		print '****'
-		for k, v in self.gen_weight_dims.items():
-			print "%s: %s" % (k, v)
-		print '****'
-		for k, v in self.disc_weight_dims.items():
-			print "%s: %s" % (k, v)
-	
+	def DCGANgenerator(z, scope='generator'):
+		#z: [?, 100]
+		gen_strides = [2, 2, 2, 2]
+		gen_kernel_sizes = [5, 3, 3, 3, 3]
+		gen_weight_dims = OrderedDict([('g_h4_W', (5, 5, 1, 96)), ('g_h3_W', (3, 3, 96, 192)), ('g_h2_W', (3, 3, 192, 384)), \
+										('g_h1_W', (3, 3, 384, 512)), ('g_h0_lin_W', (100, 2048))])
+		batch_size = config.z_batch_size
+		gen_output_dims = OrderedDict([('g_h4_out', (28, 28)), ('g_h3_out', (14, 14)), ('g_h2_out', (7, 7)), ('g_h1_out', (4, 4)), ('g_h0_out', (2, 2))])
 
-	def initialize_wgts(self, scope_str):
+		with tf.variable_scope(scope) as scope:
+			self.g_batch_norm = AttributeDict([("g_bn%i" % gbn_i, batch_norm(name='g_bn%i' % gbn_i)) for gbn_i in range(len(gen_strides))])
+			h = linear(z, gen_weight_dims["g_h0_lin_W"][-1], 'g_h0_lin')
+			h = tf.nn.relu(g_batch_norm.g_bn0(h))
+			h = tf.reshape(h, [batch_size, gen_output_dims["g_h0_out"][0], gen_output_dims["g_h0_out"][1], -1])
 
-		if scope_str == "generator":
-			weight_dims = self.gen_weight_dims
-			numz = self.num_gen
-		elif scope_str == "discriminator":
-			weight_dims = self.disc_weight_dims
-			numz = self.num_disc
-		else:
-			raise RuntimeError("invalid scope!")
-
-		param_list = []
-		with tf.variable_scope(scope_str) as scope:
-			for zi in xrange(numz):
-				for m in xrange(self.num_mcmc):
-					wgts_ = AttributeDict()
-					for name, shape in weight_dims.iteritems():
-						wgts_[name] = tf.get_variable("%s_%04d_%04d" % (name, zi, m),
-													  shape, initializer=tf.random_normal_initializer(stddev=0.02))
-					param_list.append(wgts_)
-			return param_list
-
-	def generator(self, z, gen_params):
-
-		with tf.variable_scope("generator") as scope:
-
-			h = linear(z, self.gen_weight_dims["g_h0_lin_W"][-1], 'g_h0_lin',
-					   matrix=gen_params.g_h0_lin_W, bias=gen_params.g_h0_lin_b)
-			h = tf.nn.relu(self.g_batch_norm.g_bn0(h))
-
-			h = tf.reshape(h, [self.batch_size, self.gen_output_dims["g_h0_out"][0],
-							   self.gen_output_dims["g_h0_out"][1], -1])
-
-			for layer in range(1, len(self.gen_strides)+1):
-
-				out_shape = [self.batch_size, self.gen_output_dims["g_h%i_out" % layer][0],
-							 self.gen_output_dims["g_h%i_out" % layer][1], self.gen_weight_dims["g_h%i_W" % layer][-2]]
+			for layer in range(1, len(gen_strides)+1):
+				out_shape = [batch_size, gen_output_dims["g_h%i_out" % layer][0],
+							 gen_output_dims["g_h%i_out" % layer][1], gen_weight_dims["g_h%i_W" % layer][-2]]
 
 				h = deconv2d(h,
 							 out_shape,
-							 k_h=self.gen_kernel_sizes[layer-1], k_w=self.gen_kernel_sizes[layer-1],
-							 d_h=self.gen_strides[layer-1], d_w=self.gen_strides[layer-1],
-							 name='g_h%i' % layer,
-							 w=gen_params["g_h%i_W" % layer], biases=gen_params["g_h%i_b" % layer])
-				if layer < len(self.gen_strides):
-					h = tf.nn.relu(self.g_batch_norm["g_bn%i" % layer](h))
+							 k_h=gen_kernel_sizes[layer-1], k_w=gen_kernel_sizes[layer-1],
+							 d_h=gen_strides[layer-1], d_w=gen_strides[layer-1],
+							 name='g_h%i' % layer)
+				if layer < len(gen_strides):
+					h = tf.nn.relu(g_batch_norm["g_bn%i" % layer](h))
+		return tf.nn.tanh(h) 
 
-			return tf.nn.tanh(h)
-
-	def discriminator(self, image, K, disc_params, train=True):
-
-		with tf.variable_scope("discriminator") as scope:
-
-			h = image
-			for layer in range(len(self.disc_strides)):
-				if layer == 0:
-					h = lrelu(conv2d(h,
-									 self.disc_weight_dims["d_h%i_W" % layer][-1],
-									 name='d_h%i_conv' % layer,
-									 k_h=self.disc_kernel_sizes[layer], k_w=self.disc_kernel_sizes[layer],
-									 d_h=self.disc_strides[layer], d_w=self.disc_strides[layer],
-									 w=disc_params["d_h%i_W" % layer], biases=disc_params["d_h%i_b" % layer]))
-				else:
-					h = lrelu(self.d_batch_norm["d_bn%i" % layer](conv2d(h,
-																		 self.disc_weight_dims["d_h%i_W" % layer][-1],
-																		 name='d_h%i_conv' % layer,
-																		 k_h=self.disc_kernel_sizes[layer], k_w=self.disc_kernel_sizes[layer],
-																		 d_h=self.disc_strides[layer], d_w=self.disc_strides[layer],
-																		 w=disc_params["d_h%i_W" % layer], biases=disc_params["d_h%i_b" % layer]), train=train))
-
-			h_end = lrelu(linear(tf.reshape(h, [self.batch_size, -1]),
-							  self.df_dim*4, "d_h_end_lin",
-							  matrix=disc_params.d_h_end_lin_W, bias=disc_params.d_h_end_lin_b)) # for feature norm
-			h_out = linear(h_end, K,
-						   'd_h_out_lin',
-						   matrix=disc_params.d_h_out_lin_W, bias=disc_params.d_h_out_lin_b)
-			
-			return tf.nn.softmax(h_out), h_out, [h_end]
-'''
-	
 config = Config()
 hook1 = Hook(1, False, show_result)
 
