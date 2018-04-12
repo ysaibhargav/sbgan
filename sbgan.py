@@ -91,7 +91,7 @@ class SBGAN(object):
             for param in params_group:
                 param /= config.prior_std
                 # TODO: why is this reduce_mean in BGAN?
-                prior_loss -= tf.reduce_sum(tf.multiply(param, param))
+                prior_loss -= tf.reduce_mean(tf.multiply(param, param))
 
             return prior_loss / 2
 
@@ -137,12 +137,22 @@ class SBGAN(object):
             g_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * config.z_batch_size)
             for i in range(self.n_g):
                 for j in range(self.n_d):
+
+                    logits = discriminators[j](generators[i](data.z[0][i]))
+
+                    prob_except_fake = tf.reduce_logsumexp(logits[:, 1:], axis = 1)
+                    prob = tf.reduce_logsumexp(logits, axis = 1)
+                    post_g[i] += tf.reduce_mean(prob_except_fake - prob)
+
+                    '''
+                    wrong
                     post_g[i] -= num_classes * tf.reduce_sum(
                         tf.nn.softmax_cross_entropy_with_logits(
                             labels=g_labels_real,
                             logits=discriminators[j](generators[i](data.z[0][i]))
                         )
                     )
+                    '''
                 post_g[i] *= N
         
         with tf.name_scope('semisupervised_posterior/disc/'):
@@ -151,21 +161,35 @@ class SBGAN(object):
             d_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * config.x_batch_size)
             d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.n_supervised, 1]), data.ys], axis=1)
             for i in range(self.n_d):
+                'real samples'
+
+                logits = discriminators[i](data.x[i])
+                prob_except_fake = tf.reduce_logsumexp(logits[:, 1:], axis = 1)
+                prob = tf.reduce_logsumexp(logits, axis = 1)
+                post_d[i] += tf.reduce_mean(prob_except_fake - prob)
+
+                '''
+                wrong
                 post_d[i] -= num_classes * tf.reduce_sum(
                     tf.nn.sigmoid_cross_entropy_with_logits(
                         labels = d_labels_real,
                         logits=discriminators[i](data.x[i])
                     )
                 )
+                '''
+
+                'semi supervised'
                 post_d[i] -= tf.reduce_sum(
-                    tf.nn.sigmoid_cross_entropy_with_logits(
+                    tf.nn.softmax_cross_entropy_with_logits(
                         labels=d_labels_classes,
                         logits=discriminators[i](data.xs)
                     )
                 )
+                
+                'generated samples'
                 for j in range(self.n_g):
                     post_d[i] -= tf.reduce_sum(
-                        tf.nn.sigmoid_cross_entropy_with_logits(
+                        tf.nn.softmax_cross_entropy_with_logits(
                             labels=d_labels_fake,
                             logits=discriminators[i](generators[j](data.z[1][j]))
                         )
@@ -314,7 +338,8 @@ class SBGAN(object):
                     if epoch % hook.frequency == 0:
                         out = sess.run([generator(data.z[0][i]) for i, generator in \
                                 enumerate(generators)])
-                        self.test(sess, data, d_scope='discriminator')
+                        if config.exp == 'semisupervised':
+                            self.test(sess, data, d_scope='discriminator')
 
                         if hook.is_joint:
                             hook.function(**{"g_z": out, 

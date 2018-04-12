@@ -19,6 +19,7 @@ from sbgan import SBGAN
 fc = tf.contrib.layers.fully_connected
 Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 
+config = None
 
 class Config(object):
 	def __init__(self):
@@ -29,7 +30,7 @@ class Config(object):
 		self.num_epochs = 100 
 		self.prior_std = 1
 		self.step_size = 1e-3 
-		self.prior = 'xavier'
+		self.prior = 'normal'
 		self.summary_savedir = 'summary'
 		self.summary_n = 20
 		self.exp = 'semisupervised'
@@ -58,6 +59,7 @@ class Data(object):
 		_xs_train = _x_train[idx]
 		_ys_train = mnist.train.labels[idx]
 
+		#TODO: remove overlap between supervised and semi-supervised
 		dataset = tf.data.Dataset.from_tensor_slices(_x_train)
 		dataset = dataset.shuffle(buffer_size=55000).batch(config.x_batch_size)
 		self.unsupervised_iterator = dataset.make_initializable_iterator()
@@ -134,7 +136,8 @@ def discriminator(z, scope='discriminator'):
 				#weights_initializer=tf.random_normal_initializer(0, 1)):
 			h1 = fc(z, 100, scope = "h1")
 			h2 = fc(h1, 1000, scope = "h2")
-			h3 = fc(h2, 11, activation_fn = None, scope = "h3")
+			num_outputs = 11 if config.exp == 'semisupervised' else 1
+			h3 = fc(h2, num_outputs, activation_fn = None, scope = "h3")
 
 		return h3
 
