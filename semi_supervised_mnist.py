@@ -13,7 +13,7 @@ from collections import namedtuple
 from collections import OrderedDict, defaultdict
 from dcgan_ops import *
 #from bgan_util import AttributeDict
-
+from utils import AttributeDict, read_from_yaml
 from sbgan import SBGAN
 
 fc = tf.contrib.layers.fully_connected
@@ -21,16 +21,16 @@ Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 
 config = None
 
-class AttributeDict(dict):
-	def __getattr__(self, attr):
-		return self[attr]
-	def __setattr__(self, attr, value):
-		self[attr] = value
-	def __hash__(self):
-		return hash(tuple(sorted(self.items())))
+def parse_arguments():
+	parser = argparse.ArgumentParser(description='SBGAN Argument Parser')
+	parser.add_argument('-cf', '--config_file',dest='config_file', type=str)
+	return parser.parse_args()
 
 class Config(object):
 	def __init__(self):
+		config = read_from_yaml(file)
+		for k in config:
+			setattr(self, k, config[k])
 		self.x_batch_size = 200
 		self.z_batch_size = 200
 		self.z_dims = 100
@@ -207,7 +207,8 @@ def DCGANdiscriminator(z, scope='discriminator', train=True):
 					h = tf.nn.relu(g_batch_norm["g_bn%i" % layer](h))
 		return tf.nn.tanh(h) 
 
-config = Config()
+args = parse_arguments()
+config = Config(args.config_file)
 hook1 = Hook(1, False, show_result)
 
 data = Data()
@@ -217,3 +218,5 @@ m = SBGAN(generator, discriminator, n_g = config.n_g, n_d = config.n_d)
 sess = tf.Session(config=tf.ConfigProto(gpu_options = tf.GPUOptions(allow_growth=True)))
 #sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 m.train(sess, config, data, summary=False, hooks = [hook1])
+
+

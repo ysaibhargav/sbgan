@@ -1,0 +1,15 @@
+z_batch_size: 200
+prior_std: 5
+z_std: 1
+n_g: 25
+z_dims: 100
+exp: semisupervised
+x_batch_size: 200
+n_supervised: 100
+test_batch_size: 200
+prior: normal
+summary_savedir: summary
+summary_n: 20
+num_epochs: 100
+step_size: 0.00005
+n_d: 1
