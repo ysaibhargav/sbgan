@@ -12,73 +12,48 @@ from skimage.io import imsave
 from collections import namedtuple
 from collections import OrderedDict, defaultdict
 from dcgan_ops import *
-from utils import AttributeDict, read_from_yaml, setup_output_dir
+from utils import AttributeDict, read_from_yaml, setup_output_dir, Data
 from sbgan import SBGAN
 import pdb
 fc = tf.contrib.layers.fully_connected
 Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
+import logging
 
 config = None
 
-def parse_arguments():
-    parser = argparse.ArgumentParser(description='SBGAN Argument Parser')
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output-dir', dest='output_dir',
+                        type=str,
+                        help="Path to store the results.")
+    parser.add_argument('-l', '--log', action="store", dest="loglevel", type = str, 
+            default="DEBUG", help = "Logging Level")
+    parser.add_argument('--z-dims', dest='z_dims', type=int, 
+            help="Dimensionality of latent space.")
+    parser.add_argument('--ng', dest='n_g', type=int, 
+            help="Number of generator particles to use.")
+    parser.add_argument('--nd', dest='n_d', type=int, 
+            help="Number of discriminator particles to use.")
     parser.add_argument('-cf', '--config_file',dest='config_file', type=str)
-    parser.add_argument('-l', '--log', action="store", dest="loglevel", type = str, default="DEBUG", help = "Logging Level")
+    parser.add_argument('-arch', '--architecture', dest='arch', type=str, help='mlp or dcgan architecture')
+    parser.set_defaults(render=False)
     return parser.parse_args()
 
 class Config(object):
-    def __init__(self, file, loglevel):
+    def __init__(self, file, loglevel, args):
         config = read_from_yaml(file)
-        output_dir, config = setup_output_dir(config['output_dir'], config, loglevel)   
+        for arg in args.__dict__.keys():
+            value = getattr(args, arg)
+            if value is not None:
+                if arg not in config:
+                    config[arg] = None
+                config[arg] = value
+                
+        output_dir, config = setup_output_dir(config['output_dir'], config, loglevel)
         for k in config:
             setattr(self, k, config[k])
-        setattr(self, 'output_dir', output_dir) 
-
-class Data(object):
-    def __init__(self):
-        self._x_train = None
-        self._xs_train = None
-        self._ys_train = None
-        self._xs_test = None
-        self._ys_test = None
-
-    def build_graph(self, config):
-        '''
-        Modify this function according to the dataset.
-        Builds the computation graph for the data
-        '''
-        mnist = tf.contrib.learn.datasets.load_dataset("mnist")
-        _x_train = mnist.train.images[:1000]
-        idx = np.random.choice(_x_train.shape[0], size=config.n_supervised, replace=False)
-
-        _xs_train = _x_train[idx]
-        _ys_train = mnist.train.labels[idx]
-
-        #TODO: remove overlap between supervised and semi-supervised
-        dataset = tf.data.Dataset.from_tensor_slices(_x_train)
-        dataset = dataset.shuffle(buffer_size=55000).batch(config.x_batch_size)
-        self.unsupervised_iterator = dataset.make_initializable_iterator()
-        self.x = [self.unsupervised_iterator.get_next() for _ in range(config.n_d)]
-        self.z = tf.random_normal([2, config.n_g, config.z_batch_size, config.z_dims], stddev = config.z_std)
-        if config.exp == 'semisupervised':
-            self.n_classes = 10
-            dataset = tf.data.Dataset.from_tensor_slices((_xs_train, _ys_train))
-            dataset = dataset.batch(config.n_supervised)
-            dataset = dataset.map(lambda x, y: (x, tf.one_hot(indices = y, depth = 10)))
-            self.supervised_iterator = dataset.make_initializable_iterator()
-            self.xs, self.ys = self.supervised_iterator.get_next()
-            
-            if hasattr(self, 'test_num'):
-                test_len = mnist.test.images.size[0]
-                idx = np.random.choice(a=range(test_len), size=self.test_num)
-                mnist.test.images = mnist.test.images[idx]
-                mnist.test.labels = mnist.test.labels[idx]
-
-            dataset = tf.data.Dataset.from_tensor_slices((mnist.test.images, mnist.test.labels))
-            dataset = dataset.batch(config.test_batch_size)
-            dataset = dataset.map(lambda x, y: (x, tf.one_hot(indices = y, depth = 10)))
-            self.test_iterator = dataset.make_initializable_iterator()
-            self.x_test, self.y_test = self.test_iterator.get_next()
+        logger = logging.getLogger()
+        logger.info(self.__dict__)
 
 def hook_arg_filter(*_args):
     def hook_decorator(f):
@@ -114,11 +89,10 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
         if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
         file_path = os.path.join(folder_path, "%s.png"%str(fname))
-    #pdb.set_trace()
     imsave(file_path, img_grid)
 
 
-def generator(z, scope="generator"):
+def MLPgenerator(z, scope="generator"):
     with tf.variable_scope(scope):
         with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE): 
                 #weights_initializer=tf.random_normal_initializer(0, 1)):
@@ -129,7 +103,7 @@ def generator(z, scope="generator"):
             
         return o
 
-def discriminator(z, scope='discriminator'):
+def MLPdiscriminator(z, scope='discriminator'):
     with tf.variable_scope(scope):
         with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE):
                 #weights_initializer=tf.random_normal_initializer(0, 1)):
@@ -148,7 +122,6 @@ def DCGANdiscriminator(z, scope='discriminator', train=True):
     #pdb.set_trace()
     disc_strides = [2, 2, 2, 2]
     disc_kernel_sizes = [5, 3, 3, 3, 3]
-    batch_size = z.get_shape()[0]
     df_dim = 96
     output_kernels = [96, 192, 384, 512]
     z = tf.reshape(z, [-1, 28, 28, 1])
@@ -200,14 +173,24 @@ def DCGANgenerator(z, scope='generator'):
                 h = tf.nn.relu(g_batch_norm["g_bn%i" % layer](h))
     return tf.nn.tanh(h) 
 
-args = parse_arguments()
-config = Config(args.config_file, args.loglevel)
+args = parse_args()
+config = Config(args.config_file, args.loglevel, args)
 hook1 = Hook(1, False, show_result)
 
-data = Data()
-data.build_graph(config)
-m = SBGAN(DCGANgenerator, DCGANdiscriminator, n_g = config.n_g, n_d = config.n_d)
+mnist = tf.contrib.learn.datasets.load_dataset("mnist")
+data = {'train': {'x': mnist.train.images, 'y': mnist.train.labels}, 
+        'test': {'x': mnist.test.images, 'y': mnist.test.labels}}
 
+data = Data(data, num_classes=10)
+data.build_graph(config)
+
+if not hasattr(config, 'arch'):
+    setattr(config, 'arch', 'mlp')
+
+if config.arch == 'dcgan':
+    m = SBGAN(DCGANgenerator, DCGANdiscriminator, n_g = config.n_g, n_d = config.n_d)
+else:
+    m = SBGAN(MLPgenerator, MLPdiscriminator, n_g = config.n_g, n_d=config.n_d)
 sess = tf.Session(config=tf.ConfigProto(gpu_options = tf.GPUOptions(allow_growth=True)))
 m.train(sess, config, data, summary=False, hooks = [hook1])
 

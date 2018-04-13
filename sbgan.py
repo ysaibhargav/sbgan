@@ -7,7 +7,7 @@ from functools import partial
 from itertools import combinations
 import pdb
 import logging
-
+import inspect
 
 
 class SBGAN(object):
@@ -345,14 +345,20 @@ class SBGAN(object):
         '''
         testing graph and loop
         '''
-        discriminators = [self.discriminator(d_scope+"_%d_"%i) for i in range(self.n_d)]    
+        discriminators = []
+        for i in range(self.n_d):
+            discriminator = self.discriminator(d_scope+"_%d_"%i)
+            if 'train' in inspect.getfullargspec(discriminator).args:
+                discriminator = partial(discriminator, train=False)
+            discriminators.append(discriminator)
+            
         p = 0.
         for i in range(self.n_d):
             '''
             compute predictions from 1 discriminator
             '''
             p += tf.nn.softmax(
-                logits = discriminators[i](data.x_test, train=False)[:, 1:],
+                logits = discriminators[i](data.x_test)[:, 1:],
                 dim=-1
             )
         p /= self.n_d
@@ -373,9 +379,3 @@ class SBGAN(object):
         #pdb.set_trace()
         logger = logging.getLogger()
         logger.info('Test Accuracy: %.2f' % (100. * total_correct / total_samples))
-
-<<<<<<< HEAD
-=======
-
->>>>>>> d169f0e03e2d9b7ded7e40d85504092f5b8e138f
-        
