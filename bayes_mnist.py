@@ -13,24 +13,25 @@ from skimage.io import imsave
 from collections import namedtuple
 
 from sbgan import SBGAN
+from utils import AttributeDict, read_from_yaml, setup_output_dir, Data
 
 fc = tf.contrib.layers.fully_connected
 Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 
 
 class Config(object):
-    def __init__(self):
-        self.x_batch_size = 256
-        self.z_batch_size = 256
-        self.z_dims = 100
-        self.z_std = 1
-        self.n_g = 10
-        self.num_epochs = 100 
-        self.prior_std = 1
-        self.step_size = 1e-3 
-        self.prior = 'xavier'
-        self.summary_savedir = 'summary'
-        self.summary_n = 1
+    def __init__(self, file, loglevel, args):
+        config = read_from_yaml(file)
+        for arg in args.__dict__.keys():
+            value = getattr(args, arg)
+            if value is not None:
+                if arg not in config:
+                    config[arg] = None
+                config[arg] = value
+                
+        output_dir, config = setup_output_dir(config['output_dir'], config, loglevel)
+        for k in config:
+            setattr(self, k, config[k])
 
 
 def hook_arg_filter(*_args):
@@ -65,7 +66,11 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
         row = (i // grid_size[0]) * (img_h + grid_pad)
         col = (i % grid_size[1]) * (img_w + grid_pad)
         img_grid[row:row + img_h, col:col + img_w] = img
-    imsave(os.path.join(out_path, "%s.png"%str(fname)), img_grid)
+        folder_path = os.path.join(config.save_dir, 'b-mnist')
+        if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+        file_path = os.path.join(folder_path, "%s.png"%str(fname))
+    imsave(file_path, img_grid)
 
 
 def generator(z, scope="generator"):
@@ -86,7 +91,8 @@ def discriminator(x, scope="discriminator"):
                 #weights_initializer=tf.random_normal_initializer(0, 1)):
             h1 = fc(x, 200, scope = "h1")
             h2 = fc(h1, 150, scope = "h2")
-            h3 = fc(h2, 1, activation_fn = None, scope = "h3")
+            num_outputs = 11 if config.exp == 'semisupervised' else 1
+            h3 = fc(h2, num_outputs, activation_fn = None, scope = "h3")
         o = tf.nn.sigmoid(h3)
 
         #return o, h3
@@ -94,13 +100,18 @@ def discriminator(x, scope="discriminator"):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--results-path', dest='results_path',
+    parser.add_argument('--output-dir', dest='output_dir',
                         type=str, default='out',
                         help="Path to store the results.")
-    parser.add_argument('--z-dims', dest='z_dims', type=int,
-                        default=100, help="Dimensionality of latent space.")
-    parser.add_argument('--ng', dest='n_g', type=int,
-                        default=10, help="Number of generator particles to use.")
+    parser.add_argument('-l', '--log', action="store", dest="loglevel", type = str, 
+            default="DEBUG", help = "Logging Level")
+    parser.add_argument('--z-dims', dest='z_dims', type=int, 
+            help="Dimensionality of latent space.")
+    parser.add_argument('--ng', dest='n_g', type=int, 
+            help="Number of generator particles to use.")
+    parser.add_argument('--nd', dest='n_d', type=int, 
+            help="Number of discriminator particles to use.")
+    parser.add_argument('-cf', '--config_file',dest='config_file', type=str)
     parser.set_defaults(render=False)
 
     return parser.parse_args()
@@ -112,19 +123,21 @@ sess = tf.Session(config=config)
 #sess = tf_debug.LocalCLIDebugWrapperSession(sess)
 
 args = parse_args()
-config = Config()
-config.z_dims = args.z_dims
-config.n_g = args.n_g
-out_path = args.results_path
+config = Config(args.config_file, args.loglevel, args)
+out_path = args.output_dir
 
 if not os.path.exists(out_path):
     os.makedirs(out_path)
 
 mnist = tf.contrib.learn.datasets.load_dataset("mnist")
-real_data = mnist.train.images
+data = {'train': {'x': mnist.train.images, 'y': mnist.train.labels}, 
+        'test': {'x': mnist.test.images, 'y': mnist.test.labels}}
+
+data = Data(data, num_classes=10)
+data.build_graph(config)
 
 hook1 = Hook(1, False, show_result)
 
 m = SBGAN(generator, discriminator, n_g=config.n_g)
 #sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-m.train(sess, real_data, config, summary=False, hooks = [hook1])
+m.train(sess, config, data, summary=False, hooks = [hook1])

@@ -138,7 +138,8 @@ class SBGAN(object):
         num_classes = data.n_classes
         with tf.name_scope('semisupervised_posterior/gen/'):
             post_g = [0. for _ in range(self.n_g)]
-            g_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * config.z_batch_size)
+            g_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * 
+                    config.z_batch_size)
             for i in range(self.n_g):
                 for j in range(self.n_d):
 
@@ -153,8 +154,10 @@ class SBGAN(object):
         with tf.name_scope('semisupervised_posterior/disc/'):
             post_d = [0. for _ in range(self.n_d)]
             d_labels_fake = tf.constant([[1.] + [0.] * num_classes] * config.z_batch_size)
-            d_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * config.x_batch_size)
-            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.n_supervised, 1]), data.ys], axis=1)
+            d_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * 
+                    config.x_batch_size)
+            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.n_supervised, 
+                1]), data.ys], axis=1)
             for i in range(self.n_d):
                 'real samples'
 
@@ -221,9 +224,11 @@ class SBGAN(object):
         discriminators = [self.discriminator(d_scope+"_%d_"%i) for i in range(self.n_d)]
 
         if config.exp == 'unsupervised':
-            post_g, post_d = self._unsupervised_posterior(generators, discriminators, data, config, N)
+            post_g, post_d = self._unsupervised_posterior(generators, discriminators, data, 
+                    config, N)
         elif config.exp == 'semisupervised':
-            post_g, post_d = self._semisupervised_posterior(generators, discriminators, data, config, N)
+            post_g, post_d = self._semisupervised_posterior(generators, discriminators, data, 
+                    config, N)
         
         var_g = [_get_var(g_scope+"_%d_"%i) for i in range(self.n_g)]
         var_d = [_get_var(d_scope+"_%d_"%i) for i in range(self.n_d)]
@@ -329,7 +334,7 @@ class SBGAN(object):
 
                         if hook.is_joint:
                             hook.function(**{"g_z": out, 
-                                "real_data": real_data,
+                                "real_data": data._data['train']['x'],
                                 "epoch": "%d"%(epoch)})
                         else:
                             for i, _out in enumerate(out):
@@ -369,4 +374,8 @@ class SBGAN(object):
         logger = logging.getLogger()
         logger.info('Test Accuracy: %.2f' % (100. * total_correct / total_samples))
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> d169f0e03e2d9b7ded7e40d85504092f5b8e138f
         

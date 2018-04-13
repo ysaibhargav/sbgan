@@ -112,6 +112,9 @@ MNIST-data/
 *.swo
 *.swn
 *.swm
-summary/
+summary*
 *.png
 *.swl
+*.local
+test/
+results/

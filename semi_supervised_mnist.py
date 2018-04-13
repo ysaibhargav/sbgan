@@ -110,7 +110,7 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
         row = (i // grid_size[0]) * (img_h + grid_pad)
         col = (i % grid_size[1]) * (img_w + grid_pad)
         img_grid[row:row + img_h, col:col + img_w] = img
-        folder_path = os.path.join(config.output_dir, 'b-mnist')
+        folder_path = os.path.join(config.save_dir, 'b-mnist')
         if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
         file_path = os.path.join(folder_path, "%s.png"%str(fname))
@@ -123,7 +123,6 @@ def generator(z, scope="generator"):
         with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE): 
                 #weights_initializer=tf.random_normal_initializer(0, 1)):
             h1 = fc(z, 150, scope = "h1")
-        
             h2 = fc(h1, 300, scope = "h2")
             h3 = fc(h2, 784, activation_fn = None, scope = "h3")
         o = tf.nn.tanh(h3)
@@ -169,8 +168,8 @@ def DCGANdiscriminator(z, scope='discriminator', train=True):
 
         #h_end = lrelu(linear(tf.reshape(h, [batch_size, -1]), df_dim*4, "d_h_end_lin")) # for feature norm
     with tf.variable_scope(scope, reuse=tf.AUTO_REUSE) as scope:
-    	h_end = lrelu(linear(tf.contrib.layers.flatten(h), df_dim*4, "d_h_end_lin"))    
-    	h_out = linear(h_end, K, 'd_h_out_lin')
+        h_end = lrelu(linear(tf.contrib.layers.flatten(h), df_dim*4, "d_h_end_lin"))    
+        h_out = linear(h_end, K, 'd_h_out_lin')
     return h_out
 
 
