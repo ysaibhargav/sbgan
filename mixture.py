@@ -7,6 +7,7 @@ import six
 import cPickle
 import tensorflow as tf
 import scipy.io as sio
+import argparse
 import pdb
 from scipy.ndimage import imread
 from scipy.misc import imresize
@@ -14,6 +15,7 @@ from sklearn import mixture
 from collections import namedtuple
 
 from sbgan import SBGAN
+from utils import AttributeDict, read_from_yaml, setup_output_dir, Data
 
 """
 Some code borrowed from https://github.com/andrewgordonwilson/bayesgan
@@ -23,19 +25,19 @@ fc = tf.contrib.layers.fully_connected
 Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 
 class Config(object):
-    def __init__(self):
-        self.x_batch_size = 128
-        self.z_batch_size = 128
-        self.x_dims = 100
-        self.z_dims = 10
-        self.z_std = 1
-        self.n_g = 10
-        self.num_epochs = 100
-        self.prior_std = 1
-        self.prior = 'normal'
-        self.step_size = 1e-3
-        self.summary_savedir = 'summary'
-        self.summary_n = 1
+    def __init__(self, file, loglevel, args):
+        config = read_from_yaml(file)
+        for arg in args.__dict__.keys():
+            value = getattr(args, arg)
+            if value is not None:
+                if arg not in config:
+                    config[arg] = None
+                config[arg] = value
+                
+        output_dir, config = setup_output_dir(config['output_dir'], config, loglevel)
+        for k in config:
+            setattr(self, k, config[k])
+
 
 class FigPrinter():
     
@@ -170,8 +172,8 @@ def show_result(g_z, X_real, epoch):
 
 def generator(z, scope='generator'):
     with tf.variable_scope(scope):
-        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE,#):
-                weights_initializer=tf.random_normal_initializer(0, 1)):
+        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE):
+                #weights_initializer=tf.random_normal_initializer(0, 1)):
             h1 = fc(z, 10, scope = "h1")
             h2 = fc(h1, 1000, scope = "h2")
             h3 = fc(h2, 100, activation_fn = None, scope = "h3")
@@ -180,21 +182,54 @@ def generator(z, scope='generator'):
 
 def discriminator(x, scope='discriminator'):
     with tf.variable_scope(scope):
-        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE,#):
-                weights_initializer=tf.random_normal_initializer(0, 1)):
+        with tf.contrib.framework.arg_scope([fc], reuse=tf.AUTO_REUSE):
+                #weights_initializer=tf.random_normal_initializer(0, 1)):
             h1 = fc(x, 100, scope = "h1")
             h2 = fc(h1, 1000, scope = "h2")
             h3 = fc(h2, 1, activation_fn = None, scope = "h3")
 
         return h3
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output-dir', dest='output_dir',
+                        type=str, default='out',
+                        help="Path to store the results.")
+    parser.add_argument('-l', '--log', action="store", dest="loglevel", type = str,
+            default="DEBUG", help = "Logging Level")
+    parser.add_argument('--z-dims', dest='z_dims', type=int,
+            help="Dimensionality of latent space.")
+    parser.add_argument('--ng', dest='n_g', type=int,
+            help="Number of generator particles to use.")
+    parser.add_argument('--nd', dest='n_d', type=int,
+            help="Number of discriminator particles to use.")
+    parser.add_argument('-cf', '--config_file',dest='config_file', type=str)
+    parser.set_defaults(render=False)
 
-config = Config()
-real_data = SynthDataset(config.x_dims).X 
+    return parser.parse_args()
+
+
+gpu_ops = tf.GPUOptions(allow_growth=True)
+config = tf.ConfigProto(gpu_options=gpu_ops)
+sess = tf.Session(config=config)
+#sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+
+args = parse_args()
+config = Config(args.config_file, args.loglevel, args)
+out_path = args.output_dir
+
+if not os.path.exists(out_path):
+    os.makedirs(out_path)
+
+real_data = SynthDataset(100).X 
 real_data = np.array(real_data, dtype='float32')
+data = {'train': {'x': real_data}}
+
+data = Data(data)
+data.build_graph(config)
+
 hook = Hook(1, True, show_result)
 
 m = SBGAN(generator, discriminator, n_g=config.n_g)
-sess = tf.Session()
 #sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-m.train(sess, real_data, config, summary=False, hooks=[hook])
+m.train(sess, config, data, summary=False, hooks=[hook])

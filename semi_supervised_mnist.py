@@ -109,7 +109,7 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
 		row = (i // grid_size[0]) * (img_h + grid_pad)
 		col = (i % grid_size[1]) * (img_w + grid_pad)
 		img_grid[row:row + img_h, col:col + img_w] = img
-		folder_path = os.path.join(config.output_dir, 'b-mnist')
+		folder_path = os.path.join(config.save_dir, 'b-mnist')
 		if not os.path.exists(folder_path):
 				os.makedirs(folder_path)
 		file_path = os.path.join(folder_path, "%s.png"%str(fname))
