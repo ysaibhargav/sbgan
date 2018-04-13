@@ -347,7 +347,7 @@ class SBGAN(object):
             compute predictions from 1 discriminator
             '''
             p += tf.nn.softmax(
-                logits = discriminators[i](data.x_test)[:, 1:],
+                logits = discriminators[i](data.x_test, train=False)[:, 1:],
                 dim=-1
             )
         p /= self.n_d
@@ -368,6 +368,5 @@ class SBGAN(object):
         #pdb.set_trace()
         logger = logging.getLogger()
         logger.info('Test Accuracy: %.2f' % (100. * total_correct / total_samples))
-
 
         
