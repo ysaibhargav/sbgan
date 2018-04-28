@@ -166,6 +166,7 @@ class SBGAN(object):
                 prob = tf.reduce_logsumexp(logits, axis = 1)
                 post_d[i] += tf.reduce_mean(prob_except_fake - prob)
 
+                """
                 'semi supervised'
                 post_d[i] -= tf.reduce_sum(
                     tf.nn.softmax_cross_entropy_with_logits(
@@ -173,6 +174,7 @@ class SBGAN(object):
                         logits=discriminators[i](data.xs)
                     )
                 )
+                """
                 
                 'generated samples'
                 for j in range(self.n_g):
@@ -206,7 +208,7 @@ class SBGAN(object):
                 step_size 
                 prior_std
         """
-        N = 1#len(real_data)
+        N = 1#len(data._data['train']['x'])
 
         def _get_var(scope):
             return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \

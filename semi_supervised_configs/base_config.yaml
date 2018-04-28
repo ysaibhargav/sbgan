@@ -8,9 +8,9 @@ step_size: 0.001
 prior: normal
 summary_savedir: summary
 summary_n: 20
-exp: semisupervised
+exp: unsupervised
 n_supervised: 100
 n_g: 5
 n_d: 1
 test_batch_size: 200
-output_dir: './ss-mnist-exp'
+output_dir: './test'
