@@ -94,7 +94,7 @@ class SBGAN(object):
             prior_loss = 0
             for param in params_group:
                 # TODO: why is this reduce_mean in BGAN?
-                prior_loss -= tf.reduce_mean(tf.multiply(param, param))
+                prior_loss -= tf.reduce_sum(tf.multiply(param, param))
             prior_loss /= config.prior_std ** 2
 
             return prior_loss / 2
