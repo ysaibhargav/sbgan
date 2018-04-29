@@ -147,7 +147,7 @@ class SBGAN(object):
 
                     prob_except_fake = tf.reduce_logsumexp(logits[:, 1:], axis = 1)
                     prob = tf.reduce_logsumexp(logits, axis = 1)
-                    post_g[i] += tf.reduce_mean(prob_except_fake - prob)
+                    post_g[i] += tf.reduce_sum(prob_except_fake - prob)
 
                 post_g[i] *= N
         
@@ -164,9 +164,9 @@ class SBGAN(object):
                 logits = discriminators[i](data.x[i])
                 prob_except_fake = tf.reduce_logsumexp(logits[:, 1:], axis = 1)
                 prob = tf.reduce_logsumexp(logits, axis = 1)
-                post_d[i] += tf.reduce_mean(prob_except_fake - prob)
+                post_d[i] += tf.reduce_sum(prob_except_fake - prob)
 
-                """
+            
                 'semi supervised'
                 post_d[i] -= tf.reduce_sum(
                     tf.nn.softmax_cross_entropy_with_logits(
@@ -174,7 +174,7 @@ class SBGAN(object):
                         logits=discriminators[i](data.xs)
                     )
                 )
-                """
+                
                 
                 'generated samples'
                 for j in range(self.n_g):
