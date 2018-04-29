@@ -147,7 +147,7 @@ train_x = sess.run(train_x_op)
 data = {'train': {'x': train_x}} 
 """
 data = Data(data, num_classes=10)
-data.build_graph(config, shape=[-1, 28, 28, 1])
+data.build_graph(config, shape=[28, 28, 1])
 
 hook1 = Hook(1, False, show_result)
 
