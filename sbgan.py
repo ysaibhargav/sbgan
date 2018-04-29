@@ -7,7 +7,7 @@ from functools import partial
 from itertools import combinations
 import pdb
 import logging
-import inspect
+from inspect import getfullargspec, getargspec
 
 
 class SBGAN(object):
@@ -17,8 +17,13 @@ class SBGAN(object):
             n_g=5,
             n_d=1,
             kernel="rbf"):
-        self.generator = lambda scope: partial(generator, scope=scope) 
-        self.discriminator = lambda scope: partial(discriminator, scope=scope)
+        self.use_bnorm = 'isTrain' in getargspec(generator).args
+        self.generator = (lambda scope: partial(generator, scope=scope)) if not \
+                self.use_bnorm else (lambda scope, isTrain=True: partial(generator, \
+                scope=scope, isTrain=isTrain))
+        self.discriminator = (lambda scope: partial(discriminator, scope=scope)) if not \
+                self.use_bnorm else (lambda scope, isTrain=True: partial(discriminator, \
+                scope=scope, isTrain=isTrain))
         self.n_g = n_g
         self.n_d = n_d
         self.kernel = self._kernel(kernel)
@@ -224,6 +229,13 @@ class SBGAN(object):
         # initialize points from the prior (page 6, section 5)
         generators = [self.generator(g_scope+"_%d_"%i) for i in range(self.n_g)]
         discriminators = [self.discriminator(d_scope+"_%d_"%i) for i in range(self.n_d)]
+        test_generators = generators
+        test_discriminators = discriminators
+        if self.use_bnorm: 
+            test_generators = [self.generator(g_scope+"_%d_"%i, False) 
+                    for i in range(self.n_g)]
+            test_discriminators = [self.discriminator(d_scope+"_%d_"%i, False) 
+                    for i in range(self.n_d)]
 
         if config.exp == 'unsupervised':
             post_g, post_d = self._unsupervised_posterior(generators, discriminators, data, 
@@ -330,7 +342,7 @@ class SBGAN(object):
                 for hook in hooks:
                     if epoch % hook.frequency == 0:
                         out = sess.run([generator(data.z[0][i]) for i, generator in \
-                                enumerate(generators)])
+                                enumerate(test_generators)])
                         if config.exp == 'semisupervised':
                             self.test(sess, data, d_scope='discriminator')
 
