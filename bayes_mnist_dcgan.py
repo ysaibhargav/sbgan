@@ -21,6 +21,7 @@ from dcgan_ops import *
 fc = tf.contrib.layers.fully_connected
 c2d = tf.layers.conv2d
 c2d_t = tf.layers.conv2d_transpose
+bn = tf.layers.batch_normalization
 pooling = tf.layers.average_pooling2d
 Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 
@@ -85,7 +86,9 @@ def generator(x, scope="generator", isTrain=True):
     with tf.variable_scope(scope):
         fc1 = fc(x, 6*6*128, activation_fn=tf.tanh, reuse=tf.AUTO_REUSE, scope='fc1')
         x = tf.reshape(fc1, shape=[-1, 6, 6, 128])
+        #x = bn(x, training=isTrain, reuse=tf.AUTO_REUSE, name='fc-bn1')
         c1 = c2d_t(x, 64, 4, strides=2, reuse=tf.AUTO_REUSE, name='c1')
+        #c1 = bn(c1, training=isTrain, reuse=tf.AUTO_REUSE, name='c-bn1')
         c2 = c2d_t(c1, 1, 2, strides=2, reuse=tf.AUTO_REUSE, name='c2')
         o = tf.tanh(c2, name='output')
 
@@ -96,7 +99,7 @@ def discriminator(x, scope="discriminator", isTrain=True):
         c1 = c2d(x, 64, 5, reuse=tf.AUTO_REUSE, name='c1') 
         c1_a = tf.tanh(c1, name='c1_a')
         c1_p = pooling(c1_a, 2, 2, name='c1_p')
-        c2 = c2d(x, 128, 5, reuse=tf.AUTO_REUSE, name='c2') 
+        c2 = c2d(c1_p, 128, 5, reuse=tf.AUTO_REUSE, name='c2') 
         c2_a = tf.tanh(c2, name='c2_a')
         c2_p = pooling(c2_a, 2, 2, name='c2_p')
         flat = tf.contrib.layers.flatten(c2_p)
