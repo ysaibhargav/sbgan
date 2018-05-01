@@ -58,7 +58,7 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
     if not os.path.exists(os.path.join("out", "b-mnist")):
         os.mkdir(os.path.join("out", "b-mnist"))
 
-    img_height = img_width = 28
+    img_height = img_width = 64
     batch_res = 0.5 * batch_res.reshape((batch_res.shape[0], \
             img_height, img_width)) + 0.5
     img_h, img_w = batch_res.shape[1], batch_res.shape[2]
@@ -205,7 +205,7 @@ train_x_op = tf.image.resize_images(mnist.train.images, [64, 64])
 train_x = sess.run(train_x_op)
 data = {'train': {'x': train_x}} 
 data = Data(data, num_classes=10)
-data.build_graph(config, shape=[-1, 64, 64, 1])
+data.build_graph(config, shape=[64, 64, 1])
 
 hook1 = Hook(1, False, show_result)
 
