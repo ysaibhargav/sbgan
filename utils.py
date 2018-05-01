@@ -7,6 +7,7 @@ from subprocess import Popen, PIPE
 import sys
 import tensorflow as tf
 import numpy as np
+import pdb
 
 
 class Data(object):
@@ -36,9 +37,9 @@ class Data(object):
         _x_train = _x_train[:round_sz]
 
         dataset = tf.data.Dataset.from_tensor_slices(_x_train)
-        dataset = dataset.shuffle(buffer_size=55000).batch(config.x_batch_size)
         if shape is not None:
             dataset = dataset.map(lambda x: tf.reshape(x, shape))
+        dataset = dataset.shuffle(buffer_size=55000).batch(config.x_batch_size)
         self.unsupervised_iterator = dataset.make_initializable_iterator()
         self.x = [self.unsupervised_iterator.get_next() for _ in range(config.n_d)]
         self.z = tf.random_normal([2, config.n_g, config.z_batch_size, config.z_dims], 
