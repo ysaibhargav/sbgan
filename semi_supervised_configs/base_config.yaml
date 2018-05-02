@@ -1,5 +1,5 @@
-x_batch_size: 200
-z_batch_size: 200
+x_batch_size: 64
+z_batch_size: 64
 z_dims: 100
 z_std: 1
 num_epochs: 100 
@@ -12,6 +12,7 @@ exp: semisupervised
 n_supervised: 100
 n_g: 5
 n_d: 1
-test_batch_size: 200
-output_dir: './hope'
-arch: dcgan
+test_batch_size: 512
+output_dir: './semi-search'
+arch: MLP
+supervised_scaling: 1

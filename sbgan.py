@@ -173,7 +173,7 @@ class SBGAN(object):
 
             
                 'semi supervised'
-                post_d[i] -= tf.reduce_sum(
+                post_d[i] -= config.supervised_scaling * tf.reduce_sum(
                     tf.nn.softmax_cross_entropy_with_logits(
                         labels=d_labels_classes,
                         logits=discriminators[i](data.xs)
@@ -362,7 +362,7 @@ class SBGAN(object):
         discriminators = []
         for i in range(self.n_d):
             discriminator = self.discriminator(d_scope+"_%d_"%i)
-            if 'train' in inspect.getfullargspec(discriminator).args:
+            if 'train' in getfullargspec(discriminator).args:
                 discriminator = partial(discriminator, train=False)
             discriminators.append(discriminator)
             
