@@ -8,7 +8,7 @@ step_size: 0.0005
 prior: normal
 summary_savedir: summary
 summary_n: 20
-exp: semisupervised
+exp: unsupervised
 n_supervised: 100
 n_g: 5
 n_d: 1
