@@ -255,17 +255,18 @@ class SBGAN(object):
 
         # train steps
         # TODO: annealing
-        g_phi_star = [self._stein_phi_star(var_g[i], var_g, post_g) \
-                for i in range(self.n_g)]
-        g_train_steps = [[tf.assign(_var_g, _var_g+eps*g_phi_star[j][i]) for i, _var_g \
-                in enumerate(var_g[j])] for j in range(self.n_g)]
-        g_train_steps = _flatten(g_train_steps) 
+        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+            g_phi_star = [self._stein_phi_star(var_g[i], var_g, post_g) \
+                    for i in range(self.n_g)]
+            g_train_steps = [[tf.assign(_var_g, _var_g+eps*g_phi_star[j][i]) for i, _var_g \
+                    in enumerate(var_g[j])] for j in range(self.n_g)]
+            g_train_steps = _flatten(g_train_steps) 
 
-        d_phi_star = [self._stein_phi_star(var_d[i], var_d, post_d) \
-                for i in range(self.n_d)]
-        d_train_steps = [[tf.assign(_var_d, _var_d+eps*d_phi_star[j][i]) for i, _var_d \
-                in enumerate(var_d[j])] for j in range(self.n_d)]
-        d_train_steps = _flatten(d_train_steps) 
+            d_phi_star = [self._stein_phi_star(var_d[i], var_d, post_d) \
+                    for i in range(self.n_d)]
+            d_train_steps = [[tf.assign(_var_d, _var_d+eps*d_phi_star[j][i]) for i, _var_d \
+                    in enumerate(var_d[j])] for j in range(self.n_d)]
+            d_train_steps = _flatten(d_train_steps) 
 
         if summary:
             for i in range(self.n_g):
