@@ -45,12 +45,11 @@ class SBGAN(object):
         for x1, x2 in combinations(_particles, 2):
             distances.append(tf.sqrt(tf.reduce_sum((x1-x2)*(x1-x2))))
 
+        m = int(np.ceil(len(distances) / 2.)) 
         distances = tf.convert_to_tensor(distances)
-        m = tf.shape(distances)[0]//2
         median = tf.nn.top_k(distances, m).values[tf.maximum(m-1, 0)]
 
         return median**2/np.log(len(particles))
-
 
     def _kernel(self,
             kernel):
@@ -98,14 +97,12 @@ class SBGAN(object):
         elif config.prior == 'normal':
             prior_loss = 0
             for param in params_group:
-                # TODO: why is this reduce_mean in BGAN?
                 prior_loss -= tf.reduce_sum(tf.multiply(param, param))
             prior_loss /= config.prior_std ** 2
 
             return prior_loss / 2
 
     def _unsupervised_posterior(self, generators, discriminators, data, config, N):
-
         with tf.name_scope('unsupervised_posterior/gen/'):
             post_g = [0. for _ in range(self.n_g)]
             g_labels_real = tf.constant(1., shape = [config.z_batch_size, 1])
@@ -213,7 +210,7 @@ class SBGAN(object):
                 step_size 
                 prior_std
         """
-        N = 1#len(data._data['train']['x'])
+        N = 1
 
         def _get_var(scope):
             return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
@@ -222,7 +219,6 @@ class SBGAN(object):
         def _flatten(main_list):
             return [item for sub_list in main_list for item in sub_list]
 
-        #data, iterator = self._data_handler(config, real_data)
         eps = tf.placeholder(dtype=tf.float32)
         
         # network initialisation
@@ -241,8 +237,8 @@ class SBGAN(object):
             post_g, post_d = self._unsupervised_posterior(generators, discriminators, data, 
                     config, N)
         elif config.exp == 'semisupervised':
-            post_g, post_d = self._semisupervised_posterior(generators, discriminators, data, 
-                    config, N)
+            post_g, post_d = self._semisupervised_posterior(generators, discriminators, 
+                    data, config, N)
         
         var_g = [_get_var(g_scope+"_%d_"%i) for i in range(self.n_g)]
         var_d = [_get_var(d_scope+"_%d_"%i) for i in range(self.n_d)]
