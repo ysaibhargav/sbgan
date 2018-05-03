@@ -8,7 +8,7 @@ from itertools import combinations
 import pdb
 import logging
 from inspect import getfullargspec, getargspec
-
+import inspect
 
 class SBGAN(object):
     def __init__(self,
@@ -158,7 +158,7 @@ class SBGAN(object):
             d_labels_fake = tf.constant([[1.] + [0.] * num_classes] * config.z_batch_size)
             d_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * 
                     config.x_batch_size)
-            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.n_supervised, 
+            d_labels_classes = tf.concat(values=[tf.constant(0., dtype=tf.float64, shape=[config.n_supervised, 
                 1]), data.ys], axis=1)
             for i in range(self.n_d):
                 'real samples'

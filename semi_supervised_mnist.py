@@ -18,6 +18,7 @@ import pdb
 fc = tf.contrib.layers.fully_connected
 Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 import logging
+from tensorflow.examples.tutorials.mnist import input_data
 
 config = None
 
@@ -70,7 +71,7 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
     if not os.path.exists(os.path.join("out", "b-mnist")):
         os.mkdir(os.path.join("out", "b-mnist"))
 
-    img_height = img_width = 28
+    img_height = img_width = 64
     batch_res = 0.5 * batch_res.reshape((batch_res.shape[0], \
             img_height, img_width)) + 0.5
     img_h, img_w = batch_res.shape[1], batch_res.shape[2]
@@ -115,63 +116,50 @@ def MLPdiscriminator(z, scope='discriminator'):
         return h3
 
 #class and helper functions for DCGAN
-def DCGANdiscriminator(z, scope='discriminator', train=True):
+def DCGANgenerator(x, scope="generator", isTrain=True): 
+    with tf.variable_scope(scope):
+        x = tf.expand_dims(x, 1)
+        x = tf.expand_dims(x, 1)
+        # 1st hidden layer
+        conv1 = tf.layers.conv2d_transpose(x, 1024, [4, 4], strides=(1, 1), padding='valid', reuse=tf.AUTO_REUSE, name='c1')
+        lrelu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain, reuse=tf.AUTO_REUSE, name='bn1'), 0.2)
+        # 2nd hidden layer
+        conv2 = tf.layers.conv2d_transpose(lrelu1, 512, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c2')
+        lrelu2 = lrelu(tf.layers.batch_normalization(conv2, training=isTrain, reuse=tf.AUTO_REUSE, name='bn2'), 0.2)
+        # 3rd hidden layer
+        conv3 = tf.layers.conv2d_transpose(lrelu2, 256, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c3')
+        lrelu3 = lrelu(tf.layers.batch_normalization(conv3, training=isTrain, reuse=tf.AUTO_REUSE, name='bn3'), 0.2)
+        # 4th hidden layer
+        conv4 = tf.layers.conv2d_transpose(lrelu3, 128, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c4')
+        lrelu4 = lrelu(tf.layers.batch_normalization(conv4, training=isTrain, reuse=tf.AUTO_REUSE, name='bn4'), 0.2)
+        # output layer
+        conv5 = tf.layers.conv2d_transpose(lrelu4, 1, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c5')
+        o = tf.nn.tanh(conv5)
+        #import pdb; pdb.set_trace()
+        return o
 
-    K = 11
-    # z: [?, 28, 28, 1]
-    #pdb.set_trace()
-    disc_strides = [2, 2, 2, 2]
-    disc_kernel_sizes = [5, 3, 3, 3, 3]
-    df_dim = 96
-    output_kernels = [96, 192, 384, 512]
-    z = tf.reshape(z, [-1, 28, 28, 1])
-    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE) as scope:
-        d_batch_norm = AttributeDict([("d_bn%i" % dbn_i, batch_norm(name='d_bn%i' % dbn_i)) for dbn_i in range(len(disc_strides))])
-        h = z
-        for layer in range(len(disc_strides)):
-            if layer == 0:
-                h = lrelu(conv2d(h, output_kernels[layer], name='d_h%i_conv' % layer, \
-                            k_h=disc_kernel_sizes[layer], k_w=disc_kernel_sizes[layer], \
-                            d_h=disc_strides[layer], d_w=disc_strides[layer],
-                            ))
-            else:
-                h = lrelu(d_batch_norm["d_bn%i" % layer](conv2d(h, output_kernels[layer], \
-                                                            name='d_h%i_conv' % layer, k_h=disc_kernel_sizes[layer], k_w=disc_kernel_sizes[layer], \
-                                                            d_h=disc_strides[layer], d_w=disc_strides[layer]), train=train))
+# D(x)
+def DCGANdiscriminator(x, scope="discriminator", isTrain=True): 
+    #x = tf.expand_dims(x, -1)
+    with tf.variable_scope(scope):
+        # 1st hidden layer
+        conv1 = tf.layers.conv2d(x, 128, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c1')
+        lrelu1 = lrelu(conv1, 0.2)
+        # 2nd hidden layer
+        conv2 = tf.layers.conv2d(lrelu1, 256, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c2')
+        lrelu2 = lrelu(tf.layers.batch_normalization(conv2, training=isTrain, reuse=tf.AUTO_REUSE, name='bn2'), 0.2)
+        # 3rd hidden layer
+        conv3 = tf.layers.conv2d(lrelu2, 512, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c3')
+        lrelu3 = lrelu(tf.layers.batch_normalization(conv3, training=isTrain, reuse=tf.AUTO_REUSE, name='bn3'), 0.2)
+        # 4th hidden layer
+        conv4 = tf.layers.conv2d(lrelu3, 1024, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c4')
+        lrelu4 = lrelu(tf.layers.batch_normalization(conv4, training=isTrain, reuse=tf.AUTO_REUSE, name='bn4'), 0.2)
+        # output layer
+        assert config.exp == 'semisupervised'
+        conv5 = tf.layers.conv2d(lrelu4, 11, [4, 4], strides=(1, 1), padding='valid', reuse=tf.AUTO_REUSE, name='c5')
+        conv5 = tf.squeeze(conv5, [1, 2])
+        return conv5
 
-        #h_end = lrelu(linear(tf.reshape(h, [batch_size, -1]), df_dim*4, "d_h_end_lin")) # for feature norm
-    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE) as scope:
-        h_end = lrelu(linear(tf.contrib.layers.flatten(h), df_dim*4, "d_h_end_lin"))    
-        h_out = linear(h_end, K, 'd_h_out_lin')
-    return h_out
-
-
-def DCGANgenerator(z, scope='generator'):
-    #z: [?, 100]
-    gen_strides = [2, 2, 2, 2]
-    g_kernel_dim = [5, 3, 3, 3, 3]
-    g_w_dim = OrderedDict([('g_h4_W', (5, 5, 1, 96)), ('g_h3_W', (3, 3, 96, 192)), ('g_h2_W', (3, 3, 192, 384)), \
-                                    ('g_h1_W', (3, 3, 384, 512)), ('g_h0_lin_W', (100, 2048))])
-    batch_size = config.z_batch_size
-    g_out_dim = OrderedDict([('g_h4', (28, 28)), ('g_h3', (14, 14)), ('g_h2', (7, 7)), ('g_h1', (4, 4)), ('g_h0', (2, 2))])
-    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE) as scope:
-        g_batch_norm = AttributeDict([("g_bn%i" % gbn_i, batch_norm(name='g_bn%i' % gbn_i)) for gbn_i in range(len(gen_strides))])
-        h = linear(z, g_w_dim["g_h0_lin_W"][-1], 'g_h0_lin')
-        h = tf.nn.relu(g_batch_norm.g_bn0(h))
-        h = tf.reshape(h, [batch_size, g_out_dim["g_h0"][0], g_out_dim["g_h0"][1], -1])
-
-        for layer in range(1, len(gen_strides)+1):
-            out_shape = [batch_size, g_out_dim["g_h%i" % layer][0],
-                         g_out_dim["g_h%i" % layer][1], g_w_dim["g_h%i_W" % layer][-2]]
-
-            h = deconv2d(h,
-                         out_shape,
-                         k_h=g_kernel_dim[layer-1], k_w=g_kernel_dim[layer-1],
-                         d_h=gen_strides[layer-1], d_w=gen_strides[layer-1],
-                         name='g_h%i' % layer)
-            if layer < len(gen_strides):
-                h = tf.nn.relu(g_batch_norm["g_bn%i" % layer](h))
-    return tf.nn.tanh(h) 
 
 args = parse_args()
 config = Config(args.config_file, args.loglevel, args)
@@ -181,9 +169,19 @@ mnist = tf.contrib.learn.datasets.load_dataset("mnist")
 data = {'train': {'x': mnist.train.images, 'y': mnist.train.labels}, 
         'test': {'x': mnist.test.images, 'y': mnist.test.labels}}
 
-data = Data(data, num_classes=10)
-data.build_graph(config)
+sess = tf.Session(config=tf.ConfigProto(gpu_options = tf.GPUOptions(allow_growth=True)))
+mnist = input_data.read_data_sets("MNIST_data/", one_hot=True, reshape=[])
+train_x_op = tf.image.resize_images(mnist.train.images, [64, 64])
+train_x_op = (train_x_op - 0.5) / 0.5
+test_x_op = tf.image.resize_images(mnist.test.images, [64, 64])
+test_x_op = (test_x_op - 0.5) / 0.5
 
+train_x, test_x = sess.run([train_x_op, test_x_op])
+data = {'train': {'x': train_x, 'y': mnist.train.labels}, 
+        'test': {'x': test_x, 'y': mnist.test.labels}}
+
+data = Data(data, num_classes=10)
+data.build_graph(config, shape=[64, 64, 1])
 if not hasattr(config, 'arch'):
     setattr(config, 'arch', 'mlp')
 
@@ -191,7 +189,6 @@ if config.arch == 'dcgan':
     m = SBGAN(DCGANgenerator, DCGANdiscriminator, n_g = config.n_g, n_d = config.n_d)
 else:
     m = SBGAN(MLPgenerator, MLPdiscriminator, n_g = config.n_g, n_d=config.n_d)
-sess = tf.Session(config=tf.ConfigProto(gpu_options = tf.GPUOptions(allow_growth=True)))
 m.train(sess, config, data, summary=False, hooks = [hook1])
 
 
