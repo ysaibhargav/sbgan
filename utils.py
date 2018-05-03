@@ -39,6 +39,7 @@ class Data(object):
             dataset = tf.data.Dataset.from_tensor_slices(_x_train)
             if shape is not None:
                 dataset = dataset.map(lambda x: tf.reshape(x, shape))
+            
             dataset = dataset.shuffle(buffer_size=55000).batch(config.x_batch_size)
             self.unsupervised_iterator = dataset.make_initializable_iterator()
             self.x = [self.unsupervised_iterator.get_next() for _ in range(config.n_d)]

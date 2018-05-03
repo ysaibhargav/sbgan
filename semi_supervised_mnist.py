@@ -158,16 +158,13 @@ def DCGANdiscriminator(x, scope="discriminator", isTrain=True):
         assert config.exp == 'semisupervised'
         conv5 = tf.layers.conv2d(lrelu4, 11, [4, 4], strides=(1, 1), padding='valid', reuse=tf.AUTO_REUSE, name='c5')
         conv5 = tf.squeeze(conv5, [1, 2])
+        #import pdb; pdb.set_trace()
         return conv5
 
 
 args = parse_args()
 config = Config(args.config_file, args.loglevel, args)
 hook1 = Hook(1, False, show_result)
-
-mnist = tf.contrib.learn.datasets.load_dataset("mnist")
-data = {'train': {'x': mnist.train.images, 'y': mnist.train.labels}, 
-        'test': {'x': mnist.test.images, 'y': mnist.test.labels}}
 
 sess = tf.Session(config=tf.ConfigProto(gpu_options = tf.GPUOptions(allow_growth=True)))
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True, reshape=[])
