@@ -83,9 +83,9 @@ def lrelu(x, th=0.2):
     return tf.maximum(th * x, x)
 
 def generator(x, scope="generator", isTrain=True): 
-    x = tf.expand_dims(x, 1)
-    x = tf.expand_dims(x, 1)
     with tf.variable_scope(scope):
+        x = tf.expand_dims(x, 1)
+        x = tf.expand_dims(x, 1)
 
         # 1st hidden layer
         conv1 = tf.layers.conv2d_transpose(x, 1024, [4, 4], strides=(1, 1), padding='valid', reuse=tf.AUTO_REUSE, name='c1')
@@ -202,6 +202,7 @@ data = {'train': {'x': mnist.train.images, 'y': mnist.train.labels},
 """
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True, reshape=[])
 train_x_op = tf.image.resize_images(mnist.train.images, [64, 64])
+train_x_op = (train_x_op - 0.5) / 0.5
 train_x = sess.run(train_x_op)
 data = {'train': {'x': train_x}} 
 data = Data(data, num_classes=10)
