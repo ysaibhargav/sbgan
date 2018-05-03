@@ -129,7 +129,7 @@ class SBGAN(object):
                     post_d[i] -= tf.reduce_sum(
                         tf.nn.sigmoid_cross_entropy_with_logits(
                             labels=d_labels_fake,
-                            logits=discriminators[i](generators[j](data.z[0][j]))
+                            logits=discriminators[i](generators[j](data.z[1][j]))
                         )
                     )
                 post_d[i] *= N
