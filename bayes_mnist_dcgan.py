@@ -202,6 +202,7 @@ data = {'train': {'x': mnist.train.images, 'y': mnist.train.labels},
 """
 mnist = input_data.read_data_sets("MNIST_data/", one_hot=True, reshape=[])
 train_x_op = tf.image.resize_images(mnist.train.images, [64, 64])
+train_x_op = (train_x_op - 0.5) / 0.5
 train_x = sess.run(train_x_op)
 data = {'train': {'x': train_x}} 
 data = Data(data, num_classes=10)
