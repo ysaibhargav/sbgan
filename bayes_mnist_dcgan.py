@@ -83,9 +83,9 @@ def lrelu(x, th=0.2):
     return tf.maximum(th * x, x)
 
 def generator(x, scope="generator", isTrain=True): 
-    x = tf.expand_dims(x, 1)
-    x = tf.expand_dims(x, 1)
     with tf.variable_scope(scope):
+        x = tf.expand_dims(x, 1)
+        x = tf.expand_dims(x, 1)
 
         # 1st hidden layer
         conv1 = tf.layers.conv2d_transpose(x, 1024, [4, 4], strides=(1, 1), padding='valid', reuse=tf.AUTO_REUSE, name='c1')
