@@ -274,7 +274,7 @@ class SBGAN(object):
                 tf.summary.scalar('post_g_%i'%i, post_g[i])
 
                 for j, _var_g in enumerate(var_g[i]):
-                    tf.summary.histogram('generator_%i/phi_star_%s'%(i, _var_g.name), 
+                    tf.summary.histogram('generator_%i_/phi_star_%s'%(i, _var_g.name), 
                             g_phi_star[i][j])
 
             for i in range(self.n_d):
@@ -283,7 +283,7 @@ class SBGAN(object):
                 tf.summary.scalar('post_d_%i'%i, post_d[i])
                 
                 for j, _var_d in enumerate(var_d[i]):
-                    tf.summary.histogram('discriminator_%i/phi_star_%s'%(i, _var_d.name), 
+                    tf.summary.histogram('discriminator_%i_/phi_star_%s'%(i, _var_d.name), 
                             d_phi_star[i][j])
 
             tf.summary.scalar('g_bandwidth', g_bandwidth)
