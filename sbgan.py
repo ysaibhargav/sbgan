@@ -313,10 +313,14 @@ class SBGAN(object):
                 if config.exp == 'semisupervised':
                     sess.run(data.supervised_iterator.initializer)
                 try:
+                    print('minibatch processing')
                     _g_bandwidth = sess.run(g_bandwidth)
                     sess.run(g_train_steps, {\
                             eps: config.step_size, 
                             self.bandwidth: _g_bandwidth})
+
+                    if config.exp == 'semisupervised':
+                        sess.run(data.supervised_iterator.initializer)
 
                     _d_bandwidth = sess.run(d_bandwidth)
                     if summary and update_iter % config.summary_n == 0:
@@ -333,6 +337,7 @@ class SBGAN(object):
                     update_iter += 1
 
                 except tf.errors.OutOfRangeError:
+                    print('Epoch done')
                     break
 
             if hooks != None:
