@@ -15,6 +15,7 @@ import h5py
 from skimage.io import imsave
 from collections import namedtuple
 from collections import OrderedDict, defaultdict
+from download import * 
 
 from sbgan import SBGAN
 from utils import *#AttributeDict, read_from_yaml, setup_output_dir, Data
@@ -176,13 +177,18 @@ args = parse_args()
 config = Config(args.config_file, args.loglevel, args)
 out_path = args.output_dir
 
+data_path = os.path.join('data', 'celebA')
 pickled_data_path = os.path.join('data', 'pickled')
 pickled_file_path = os.path.join(pickled_data_path, 'celeba.h5')
+
 
 if not os.path.exists(out_path):
     os.makedirs(out_path)
 
 if not os.path.isfile(pickled_file_path):
+    if not os.path.exists(data_path):
+        download_celeb_a('./data')
+
     if not os.path.exists(pickled_data_path):
         os.makedirs(pickled_data_path)
 
