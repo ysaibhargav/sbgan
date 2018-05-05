@@ -187,7 +187,7 @@ if not os.path.isfile(pickled_file_path):
         os.makedirs(pickled_data_path)
 
     data = glob.glob(os.path.join("data", "celebA", "*jpg"))
-    N = 750 
+    N = 75000 
     images = [get_image(f, input_height=108, input_width=108, resize_height=64, 
         resize_width=64, crop=True, grayscale=False) for f in data[:N]]
     images = np.array(images, dtype=np.float32)
