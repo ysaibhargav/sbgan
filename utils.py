@@ -8,6 +8,7 @@ import sys
 import tensorflow as tf
 import numpy as np
 import pdb
+import scipy.misc
 
 
 class Data(object):
@@ -27,16 +28,19 @@ class Data(object):
         '''
         try:
             _x_train = self._data['train']['x']
-            idx = np.random.choice(_x_train.shape[0], size=config.n_supervised, replace=False)
-            _xs_train = _x_train[idx]
+            if config.exp == 'semisupervised':
+                idx = np.random.choice(_x_train.shape[0], size=config.n_supervised, 
+                        replace=False)
+                _xs_train = _x_train[idx]
 
-            keep_idx = list(set(range(_x_train.shape[0])) - set(idx))
-            _x_train = _x_train[keep_idx]
+                keep_idx = list(set(range(_x_train.shape[0])) - set(idx))
+                _x_train = _x_train[keep_idx]
 
             round_sz = config.x_batch_size*(_x_train.shape[0]//config.x_batch_size)
-            _x_train = _x_train[:round_sz]
+            self._x_train = _x_train = _x_train[:round_sz]
+            self.x_placeholder = tf.placeholder(tf.float32, shape=_x_train.shape)
 
-            dataset = tf.data.Dataset.from_tensor_slices(_x_train)
+            dataset = tf.data.Dataset.from_tensor_slices(self.x_placeholder)
             if shape is not None:
                 dataset = dataset.map(lambda x: tf.reshape(x, shape))
             dataset = dataset.shuffle(buffer_size=55000).batch(config.x_batch_size)
@@ -151,3 +155,72 @@ def setup_output_dir(output_dir, config, loglevel):
     logfile_handle.setFormatter(fmt)
     logger.addHandler(logfile_handle)
     return new_dirname, config
+
+def get_image(image_path, input_height, input_width,
+              resize_height=64, resize_width=64,
+              crop=True, grayscale=False):
+  image = imread(image_path, grayscale)
+  return transform(image, input_height, input_width,
+                   resize_height, resize_width, crop)
+
+def save_images(images, size, image_path):
+  return imsave(inverse_transform(images), size, image_path)
+
+def imread(path, grayscale = False):
+  if (grayscale):
+    return scipy.misc.imread(path, flatten = True).astype(np.float)
+  else:
+    return scipy.misc.imread(path).astype(np.float)
+
+def merge_images(images, size):
+  return inverse_transform(images)
+
+def merge(images, size):
+  h, w = images.shape[1], images.shape[2]
+  if (images.shape[3] in (3,4)):
+    c = images.shape[3]
+    img = np.zeros((h * size[0], w * size[1], c))
+    for idx, image in enumerate(images):
+      i = idx % size[1]
+      j = idx // size[1]
+      img[j * h:j * h + h, i * w:i * w + w, :] = image
+    return img
+  elif images.shape[3]==1:
+    img = np.zeros((h * size[0], w * size[1]))
+    for idx, image in enumerate(images):
+      i = idx % size[1]
+      j = idx // size[1]
+      img[j * h:j * h + h, i * w:i * w + w] = image[:,:,0]
+    return img
+  else:
+    raise ValueError('in merge(images,size) images parameter '
+                     'must have dimensions: HxW or HxWx3 or HxWx4')
+
+def imsave(images, size, path):
+  image = np.squeeze(merge(images, size))
+  return scipy.misc.imsave(path, image)
+
+def center_crop(x, crop_h, crop_w,
+                resize_h=64, resize_w=64):
+  if crop_w is None:
+    crop_w = crop_h
+  h, w = x.shape[:2]
+  j = int(round((h - crop_h)/2.))
+  i = int(round((w - crop_w)/2.))
+  return scipy.misc.imresize(
+      x[j:j+crop_h, i:i+crop_w], [resize_h, resize_w])
+
+def transform(image, input_height, input_width, 
+              resize_height=64, resize_width=64, crop=True):
+  if crop:
+    cropped_image = center_crop(
+      image, input_height, input_width, 
+      resize_height, resize_width)
+  else:
+    cropped_image = scipy.misc.imresize(image, [resize_height, resize_width])
+  return np.array(cropped_image)/127.5 - 1.
+
+def inverse_transform(images):
+  return (images+1.)/2.
+
+

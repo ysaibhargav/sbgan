@@ -305,7 +305,8 @@ class SBGAN(object):
         # run
         for epoch in range(config.num_epochs): 
             print(epoch)
-            sess.run(data.unsupervised_iterator.initializer)            
+            sess.run(data.unsupervised_iterator.initializer, 
+                    {data.x_placeholder: data._x_train})            
 
             # TODO: multiple opt steps 
             while True:
