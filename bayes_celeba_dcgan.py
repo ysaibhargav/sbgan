@@ -15,10 +15,10 @@ import h5py
 from skimage.io import imsave
 from collections import namedtuple
 from collections import OrderedDict, defaultdict
-from download import * 
+from download import *
 
 from sbgan import SBGAN
-from utils import *#AttributeDict, read_from_yaml, setup_output_dir, Data
+from utils import AttributeDict, read_from_yaml, setup_output_dir, Data, get_image
 from dcgan_ops import *
 
 fc = tf.contrib.layers.fully_connected
