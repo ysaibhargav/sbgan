@@ -19,6 +19,7 @@ fc = tf.contrib.layers.fully_connected
 Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 import logging
 from tensorflow.examples.tutorials.mnist import input_data
+import skimage.transform
 
 config = None
 
@@ -73,11 +74,11 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
 
     img_height = img_width = 64
     batch_res = 0.5 * batch_res.reshape((batch_res.shape[0], \
-            img_height, img_width)) + 0.5
+            img_height, img_width, 3)) + 0.5
     img_h, img_w = batch_res.shape[1], batch_res.shape[2]
     grid_h = img_h * grid_size[0] + grid_pad * (grid_size[0] - 1)
     grid_w = img_w * grid_size[1] + grid_pad * (grid_size[1] - 1)
-    img_grid = np.zeros((grid_h, grid_w), dtype=np.uint8)
+    img_grid = np.zeros((grid_h, grid_w, 3), dtype=np.uint8)
     for i, res in enumerate(batch_res):
         if i >= grid_size[0] * grid_size[1]:
             break
@@ -85,7 +86,7 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
         img = img.astype(np.uint8)
         row = (i // grid_size[0]) * (img_h + grid_pad)
         col = (i % grid_size[1]) * (img_w + grid_pad)
-        img_grid[row:row + img_h, col:col + img_w] = img
+        img_grid[row:row + img_h, col:col + img_w, :] = img
         folder_path = os.path.join(config.save_dir, 'b-mnist')
         if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
@@ -115,6 +116,7 @@ def MLPdiscriminator(z, scope='discriminator'):
 
         return h3
 
+
 #class and helper functions for DCGAN
 def DCGANgenerator(x, scope="generator", isTrain=True): 
     with tf.variable_scope(scope):
@@ -133,7 +135,7 @@ def DCGANgenerator(x, scope="generator", isTrain=True):
         conv4 = tf.layers.conv2d_transpose(lrelu3, 128, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c4')
         lrelu4 = lrelu(tf.layers.batch_normalization(conv4, training=isTrain, reuse=tf.AUTO_REUSE, name='bn4'), 0.2)
         # output layer
-        conv5 = tf.layers.conv2d_transpose(lrelu4, 1, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c5')
+        conv5 = tf.layers.conv2d_transpose(lrelu4, 3, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c5')
         o = tf.nn.tanh(conv5)
         #import pdb; pdb.set_trace()
         return o
@@ -167,18 +169,30 @@ config = Config(args.config_file, args.loglevel, args)
 hook1 = Hook(1, False, show_result)
 
 sess = tf.Session(config=tf.ConfigProto(gpu_options = tf.GPUOptions(allow_growth=True)))
-mnist = input_data.read_data_sets("MNIST_data/", one_hot=True, reshape=[])
-train_x_op = tf.image.resize_images(mnist.train.images, [64, 64])
-train_x_op = (train_x_op - 0.5) / 0.5
-test_x_op = tf.image.resize_images(mnist.test.images, [64, 64])
-test_x_op = (test_x_op - 0.5) / 0.5
 
+
+svhn_train_images = np.load('svhn/svhn.train.images.npy')
+svhn_test_images = np.load('svhn/svhn.test.images.npy')
+svhn_train_labels = np.load('svhn/svhn.train.labels.npy')
+svhn_test_labels = np.load('svhn/svhn.test.labels.npy')
+train_x = np.array([skimage.transform.resize(w, (64, 64)) for w in svhn_train_images])
+test_x = np.array([skimage.transform.resize(w, (64, 64)) for w in svhn_test_images])
+print('Data preprocessing done')
+'''
+train_x_op = tf.image.resize_images(svhn_train_images, [64, 64])
+test_x_op = tf.image.resize_images(svhn_test_images, [64, 64])
 train_x, test_x = sess.run([train_x_op, test_x_op])
-data = {'train': {'x': train_x.astype(np.float32), 'y': mnist.train.labels.astype(np.float32)}, 
-        'test': {'x': test_x.astype(np.float32), 'y': mnist.test.labels.astype(np.float32)}}
+'''
+
+train_y_op = tf.one_hot(svhn_train_labels, 10)
+test_y_op = tf.one_hot(svhn_test_labels, 10)
+train_y, test_y = sess.run([train_y_op, test_y_op])
+
+data = {'train': {'x': train_x.astype(np.float32), 'y': train_y.astype(np.float32)}, 
+        'test': {'x': test_x.astype(np.float32), 'y': test_y.astype(np.float32)}}
 
 data = Data(data, num_classes=10)
-data.build_graph(config, shape=[64, 64, 1])
+data.build_graph(config, shape=[64, 64, 3])
 if not hasattr(config, 'arch'):
     setattr(config, 'arch', 'mlp')
 

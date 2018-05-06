@@ -158,7 +158,7 @@ class SBGAN(object):
             d_labels_fake = tf.constant([[1.] + [0.] * num_classes] * config.z_batch_size)
             d_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * 
                     config.x_batch_size)
-            d_labels_classes = tf.concat(values=[tf.constant(0., dtype=tf.float64, shape=[config.n_supervised, 
+            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.n_supervised, 
                 1]), data.ys], axis=1)
             for i in range(self.n_d):
                 'real samples'
@@ -313,7 +313,7 @@ class SBGAN(object):
                 if config.exp == 'semisupervised':
                     sess.run(data.supervised_iterator.initializer)
                 try:
-                    print('minibatch processing')
+                    #print('minibatch processing')
                     _g_bandwidth = sess.run(g_bandwidth)
                     sess.run(g_train_steps, {\
                             eps: config.step_size, 
