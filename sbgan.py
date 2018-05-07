@@ -307,12 +307,11 @@ class SBGAN(object):
         for epoch in range(config.num_epochs): 
             print(epoch)
             sess.run(data.unsupervised_iterator.initializer, 
-                    {data.x_placeholder: data._x_train})            
-
+                    {data.x_placeholder: data._x_train})
+            if config.exp == 'semisupervised':
+                sess.run(data.supervised_iterator.initializer)
             # TODO: multiple opt steps 
             while True:
-                if config.exp == 'semisupervised':
-                    sess.run(data.supervised_iterator.initializer)
                 try:
                     #print('minibatch processing')
                     _g_bandwidth = sess.run(g_bandwidth)
@@ -320,8 +319,6 @@ class SBGAN(object):
                             eps: config.step_size, 
                             self.bandwidth: _g_bandwidth})
 
-                    if config.exp == 'semisupervised':
-                        sess.run(data.supervised_iterator.initializer)
 
                     _d_bandwidth = sess.run(d_bandwidth)
                     if summary and update_iter % config.summary_n == 0:

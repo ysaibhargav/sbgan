@@ -54,10 +54,10 @@ class Data(object):
             _y_train = self._data['train']['y']
             _ys_train = _y_train[idx]
 
-            dataset = tf.data.Dataset.from_tensor_slices((_xs_train, _ys_train))
+            dataset = tf.data.Dataset.from_tensor_slices((_xs_train, _ys_train)).repeat()
             if shape is not None:
                 dataset = dataset.map(lambda x, y: (tf.reshape(x, shape), y))
-            dataset = dataset.batch(config.n_supervised)
+            dataset = dataset.batch(config.x_batch_size)
             self.supervised_iterator = dataset.make_initializable_iterator()
             self.xs, self.ys = self.supervised_iterator.get_next()
             
