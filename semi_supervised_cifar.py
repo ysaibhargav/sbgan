@@ -69,8 +69,8 @@ def hook_arg_filter(*_args):
 def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
     if not os.path.exists("out"):
         os.mkdir("out")
-    if not os.path.exists(os.path.join("out", "b-mnist")):
-        os.mkdir(os.path.join("out", "b-mnist"))
+    if not os.path.exists(os.path.join("out", "cifar")):
+        os.mkdir(os.path.join("out", "cifar"))
 
     img_height = img_width = 64
     batch_res = 0.5 * batch_res.reshape((batch_res.shape[0], \
@@ -87,7 +87,7 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
         row = (i // grid_size[0]) * (img_h + grid_pad)
         col = (i % grid_size[1]) * (img_w + grid_pad)
         img_grid[row:row + img_h, col:col + img_w, :] = img
-        folder_path = os.path.join(config.save_dir, 'b-mnist')
+        folder_path = os.path.join(config.save_dir, 'cifar')
         if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
         file_path = os.path.join(folder_path, "%s.png"%str(fname))
