@@ -158,9 +158,8 @@ class SBGAN(object):
             d_labels_fake = tf.constant([[1.] + [0.] * num_classes] * config.z_batch_size)
             d_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * 
                     config.x_batch_size)
-            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.n_supervised, 
+            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.x_batch_size, 
                 1]), data.ys], axis=1)
-            scaling_factor = 1. * config.supervised_scaling * config.x_batch_size / config.n_supervised
             for i in range(self.n_d):
                 'real samples'
 
@@ -171,7 +170,7 @@ class SBGAN(object):
 
             
                 'semi supervised'
-                post_d[i] -= scaling_factor * tf.reduce_sum(
+                post_d[i] -= config.supervised_scaling * tf.reduce_sum(
                     tf.nn.softmax_cross_entropy_with_logits(
                         labels=d_labels_classes,
                         logits=discriminators[i](data.xs)
