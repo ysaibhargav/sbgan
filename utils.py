@@ -26,50 +26,50 @@ class Data(object):
         Modify this function according to the dataset.
         Builds the computation graph for the data
         '''
-        try:
-            _x_train = self._data['train']['x']
-            if config.exp == 'semisupervised':
-                idx = np.random.choice(_x_train.shape[0], size=config.n_supervised, 
-                        replace=False)
-                _xs_train = _x_train[idx]
+        #try:
+        _x_train = self._data['train']['x']
+        if config.exp == 'semisupervised':
+            idx = np.random.choice(_x_train.shape[0], size=config.n_supervised, 
+                    replace=False)
+            _xs_train = _x_train[idx]
 
-                keep_idx = list(set(range(_x_train.shape[0])) - set(idx))
-                _x_train = _x_train[keep_idx]
+            keep_idx = list(set(range(_x_train.shape[0])) - set(idx))
+            _x_train = _x_train[keep_idx]
 
-            round_sz = config.x_batch_size*(_x_train.shape[0]//config.x_batch_size)
-            self._x_train = _x_train = _x_train[:round_sz]
-            self.x_placeholder = tf.placeholder(tf.float32, shape=_x_train.shape)
+        round_sz = config.x_batch_size*(_x_train.shape[0]//config.x_batch_size)
+        self._x_train = _x_train = _x_train[:round_sz]
+        self.x_placeholder = tf.placeholder(tf.float32, shape=_x_train.shape)
 
-            dataset = tf.data.Dataset.from_tensor_slices(self.x_placeholder)
+        dataset = tf.data.Dataset.from_tensor_slices(self.x_placeholder)
+        if shape is not None:
+            dataset = dataset.map(lambda x: tf.reshape(x, shape))
+        
+        dataset = dataset.shuffle(buffer_size=55000).batch(config.x_batch_size)
+        self.unsupervised_iterator = dataset.make_initializable_iterator()
+        self.x = [self.unsupervised_iterator.get_next() for _ in range(config.n_d)]
+        self.z = tf.random_normal([2, config.n_g, config.z_batch_size, config.z_dims], 
+                stddev = config.z_std)
+
+        if config.exp == 'semisupervised':
+            _y_train = self._data['train']['y']
+            _ys_train = _y_train[idx]
+
+            dataset = tf.data.Dataset.from_tensor_slices((_xs_train, _ys_train))
             if shape is not None:
-                dataset = dataset.map(lambda x: tf.reshape(x, shape))
+                dataset = dataset.map(lambda x, y: (tf.reshape(x, shape), y))
+            dataset = dataset.batch(config.n_supervised)
+            self.supervised_iterator = dataset.make_initializable_iterator()
+            self.xs, self.ys = self.supervised_iterator.get_next()
             
-            dataset = dataset.shuffle(buffer_size=55000).batch(config.x_batch_size)
-            self.unsupervised_iterator = dataset.make_initializable_iterator()
-            self.x = [self.unsupervised_iterator.get_next() for _ in range(config.n_d)]
-            self.z = tf.random_normal([2, config.n_g, config.z_batch_size, config.z_dims], 
-                    stddev = config.z_std)
-
-            if config.exp == 'semisupervised':
-                _y_train = self._data['train']['y']
-                _ys_train = _y_train[idx]
-
-                dataset = tf.data.Dataset.from_tensor_slices((_xs_train, _ys_train))
-                if shape is not None:
-                    dataset = dataset.map(lambda x, y: (tf.reshape(x, shape), y))
-                dataset = dataset.batch(config.n_supervised)
-                self.supervised_iterator = dataset.make_initializable_iterator()
-                self.xs, self.ys = self.supervised_iterator.get_next()
-                
-                dataset = tf.data.Dataset.from_tensor_slices((self._data['test']['x'], 
-                    self._data['test']['y']))
-                if shape is not None:
-                    dataset = dataset.map(lambda x, y: (tf.reshape(x, shape), y))
-                dataset = dataset.batch(config.test_batch_size)
-                self.test_iterator = dataset.make_initializable_iterator()
-                self.x_test, self.y_test = self.test_iterator.get_next()
-        except:
-            import pdb; pdb.set_trace()
+            dataset = tf.data.Dataset.from_tensor_slices((self._data['test']['x'], 
+                self._data['test']['y']))
+            if shape is not None:
+                dataset = dataset.map(lambda x, y: (tf.reshape(x, shape), y))
+            dataset = dataset.batch(config.test_batch_size)
+            self.test_iterator = dataset.make_initializable_iterator()
+            self.x_test, self.y_test = self.test_iterator.get_next()
+        #except:
+        #    import pdb; pdb.set_trace()
 
 
 def read_from_yaml(filepath):
