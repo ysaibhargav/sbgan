@@ -108,7 +108,7 @@ class SBGAN(object):
             g_labels_real = tf.constant(1., shape = [config.z_batch_size, 1])
             for i in range(self.n_g):
                 for j in range(self.n_d):
-                    post_g[i] -= tf.reduce_sum(
+                    post_g[i] -= tf.reduce_mean(
                         tf.nn.sigmoid_cross_entropy_with_logits(
                             labels=g_labels_real,
                             logits=discriminators[j](generators[i](data.z[0][i]))
@@ -120,12 +120,12 @@ class SBGAN(object):
             d_labels_real = tf.constant(1., shape=(config.x_batch_size, 1))
             d_labels_fake = tf.constant(0., shape=(config.z_batch_size, 1))
             for i in range(self.n_d):
-                post_d[i] -= tf.reduce_sum(
+                post_d[i] -= tf.reduce_mean(
                     tf.nn.sigmoid_cross_entropy_with_logits(
                         labels=d_labels_real,
                         logits=discriminators[i](data.x[i])))
                 for j in range(self.n_g):
-                    post_d[i] -= tf.reduce_sum(
+                    post_d[i] -= tf.reduce_mean(
                         tf.nn.sigmoid_cross_entropy_with_logits(
                             labels=d_labels_fake,
                             logits=discriminators[i](generators[j](data.z[0][j]))
@@ -147,7 +147,7 @@ class SBGAN(object):
 
                     prob_except_fake = tf.reduce_logsumexp(logits[:, 1:], axis = 1)
                     prob = tf.reduce_logsumexp(logits, axis = 1)
-                    post_g[i] += tf.reduce_sum(prob_except_fake - prob)
+                    post_g[i] += tf.reduce_mean(prob_except_fake - prob)
         
         with tf.name_scope('semisupervised_posterior/disc/'):
             post_d = [0. for _ in range(self.n_d)]
@@ -162,11 +162,11 @@ class SBGAN(object):
                 logits = discriminators[i](data.x[i])
                 prob_except_fake = tf.reduce_logsumexp(logits[:, 1:], axis = 1)
                 prob = tf.reduce_logsumexp(logits, axis = 1)
-                post_d[i] += tf.reduce_sum(prob_except_fake - prob)
+                post_d[i] += tf.reduce_mean(prob_except_fake - prob)
 
             
                 'semi supervised'
-                post_d[i] -= config.supervised_scaling * tf.reduce_sum(
+                post_d[i] -= config.supervised_scaling * tf.reduce_mean(
                     tf.nn.softmax_cross_entropy_with_logits(
                         labels=d_labels_classes,
                         logits=discriminators[i](data.xs)
@@ -176,7 +176,7 @@ class SBGAN(object):
                 
                 'generated samples'
                 for j in range(self.n_g):
-                    post_d[i] -= tf.reduce_sum(
+                    post_d[i] -= tf.reduce_mean(
                         tf.nn.softmax_cross_entropy_with_logits(
                             labels=d_labels_fake,
                             logits=discriminators[i](generators[j](data.z[0][j]))
