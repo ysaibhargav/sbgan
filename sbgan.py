@@ -76,11 +76,11 @@ class SBGAN(object):
         for i, particle in enumerate(particles):
             grad_log_post = tf.gradients(posterior[i], particle)
             grad_kernel = tf.gradients(self.kernel(particle, theta), \
-                    particle) / self.N
+                    particle)
             kernel_dist = self.kernel(particle, theta)
 
             for j in range(num_param):
-                phi_star[j] += kernel_dist*grad_log_post[j] + grad_kernel[j]
+                phi_star[j] += kernel_dist*grad_log_post[j] + grad_kernel[j]/self.N
 
         for j in range(num_param):
             phi_star[j] /= len(particles)
