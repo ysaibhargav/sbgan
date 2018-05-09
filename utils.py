@@ -37,6 +37,7 @@ class Data(object):
             _x_train = _x_train[keep_idx]
 
         round_sz = config.x_batch_size*(_x_train.shape[0]//config.x_batch_size)
+        self.data_len = round_sz
         self._x_train = _x_train = _x_train[:round_sz]
         self.x_placeholder = tf.placeholder(tf.float32, shape=_x_train.shape)
 

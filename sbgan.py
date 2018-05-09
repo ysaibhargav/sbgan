@@ -76,7 +76,7 @@ class SBGAN(object):
         for i, particle in enumerate(particles):
             grad_log_post = tf.gradients(posterior[i], particle)
             grad_kernel = tf.gradients(self.kernel(particle, theta), \
-                    particle)
+                    particle) / self.N
             kernel_dist = self.kernel(particle, theta)
 
             for j in range(num_param):
@@ -100,9 +100,9 @@ class SBGAN(object):
                 prior_loss -= tf.reduce_sum(tf.multiply(param, param))
             prior_loss /= config.prior_std ** 2
 
-            return prior_loss / 2
+            return prior_loss / 2. / self.N
 
-    def _unsupervised_posterior(self, generators, discriminators, data, config, N):
+    def _unsupervised_posterior(self, generators, discriminators, data, config):
         with tf.name_scope('unsupervised_posterior/gen/'):
             post_g = [0. for _ in range(self.n_g)]
             g_labels_real = tf.constant(1., shape = [config.z_batch_size, 1])
@@ -114,7 +114,6 @@ class SBGAN(object):
                             logits=discriminators[j](generators[i](data.z[0][i]))
                         )
                     )
-                post_g[i] *= N
         
         with tf.name_scope('unsupervised_posterior/disc/'):
             post_d = [0. for _ in range(self.n_d)]
@@ -132,11 +131,10 @@ class SBGAN(object):
                             logits=discriminators[i](generators[j](data.z[0][j]))
                         )
                     )
-                post_d[i] *= N
         
         return post_g, post_d
 
-    def _semisupervised_posterior(self, generators, discriminators, data, config, N):
+    def _semisupervised_posterior(self, generators, discriminators, data, config):
         num_classes = data.n_classes
         with tf.name_scope('semisupervised_posterior/gen/'):
             post_g = [0. for _ in range(self.n_g)]
@@ -150,8 +148,6 @@ class SBGAN(object):
                     prob_except_fake = tf.reduce_logsumexp(logits[:, 1:], axis = 1)
                     prob = tf.reduce_logsumexp(logits, axis = 1)
                     post_g[i] += tf.reduce_sum(prob_except_fake - prob)
-
-                post_g[i] *= N
         
         with tf.name_scope('semisupervised_posterior/disc/'):
             post_d = [0. for _ in range(self.n_d)]
@@ -186,7 +182,6 @@ class SBGAN(object):
                             logits=discriminators[i](generators[j](data.z[0][j]))
                         )
                     )
-                post_d[i] *= N
 
         return post_g, post_d
 
@@ -210,7 +205,7 @@ class SBGAN(object):
                 step_size 
                 prior_std
         """
-        N = 1
+        self.N = data.data_len
 
         def _get_var(scope):
             return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
@@ -235,10 +230,10 @@ class SBGAN(object):
 
         if config.exp == 'unsupervised':
             post_g, post_d = self._unsupervised_posterior(generators, discriminators, data, 
-                    config, N)
+                    config)
         elif config.exp == 'semisupervised':
             post_g, post_d = self._semisupervised_posterior(generators, discriminators, 
-                    data, config, N)
+                    data, config)
         
         var_g = [_get_var(g_scope+"_%d_"%i) for i in range(self.n_g)]
         var_d = [_get_var(d_scope+"_%d_"%i) for i in range(self.n_d)]
