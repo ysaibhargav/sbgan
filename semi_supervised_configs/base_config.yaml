@@ -4,11 +4,11 @@ z_dims: 100
 z_std: 1
 num_epochs: 100 
 prior_std: 1
-step_size: 0.005
+step_size: 0.0005
 prior: normal
 summary_savedir: summary
 summary_n: 20
-exp: unsupervised
+exp: semisupervised
 summary: True
 n_supervised: 2000
 n_g: 10
