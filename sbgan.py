@@ -276,12 +276,10 @@ class SBGAN(object):
                     tf.summary.histogram('generator_%i_/phi_star_%s'%(i, _var_g.name), 
                             g_phi_star[i][j])
             """
-
             for i in range(self.n_d):
                 tf.summary.scalar('prior_d_%i'%i, prior_d[i])
                 tf.summary.scalar('likelihood_d_%i'%i, post_d[i]-prior_d[i])
                 tf.summary.scalar('post_d_%i'%i, post_d[i])
-                
             """
                 for j, _var_d in enumerate(var_d[i]):
                     tf.summary.histogram('discriminator_%i_/phi_star_%s'%(i, _var_d.name), 

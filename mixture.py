@@ -64,16 +64,25 @@ class SynthDataset():
         self.N = 10000
         self.true_z_dim = 2
         # generate synthetic data
-        self.Xs = []
+        self.Xs, Y = [], []
         for _ in range(num_clusters):
             cluster_mean = np.random.randn(self.true_z_dim) * 5 # to make them more spread
             A = np.random.randn(self.x_dim, self.true_z_dim) * 5
             X = np.dot(np.random.randn(int(self.N / num_clusters), self.true_z_dim) + 
                     cluster_mean, A.T)
             self.Xs.append(X)
+            Y.append([_ for dummy in range(int(self.N / num_clusters))])
         X_raw = np.concatenate(self.Xs)
+        self.Y = np.concatenate(Y)
         self.X = (X_raw - X_raw.mean(0)) / (X_raw.std(0))
-        print(self.X.shape)
+
+        idx = np.arange(self.N)
+        np.random.shuffle(idx)
+
+        self.X_train = self.X[idx[:int(self.N*0.9)]]
+        self.Y_train = self.Y[idx[:int(self.N*0.9)]]
+        self.X_test = self.X[idx[int(self.N*0.9):]]
+        self.Y_test = self.Y[idx[int(self.N*0.9):]]
         
         
     def next_batch(self, batch_size):
@@ -184,7 +193,10 @@ def discriminator(x, scope='discriminator'):
                 #weights_initializer=tf.random_normal_initializer(0, 1)):
             h1 = fc(x, 100, scope = "h1")
             h2 = fc(h1, 1000, scope = "h2")
-            h3 = fc(h2, 1, activation_fn = None, scope = "h3")
+            n_out = 1
+            if config.exp == 'semisupervised':
+                n_out = 11
+            h3 = fc(h2, n_out, activation_fn = None, scope = "h3")
 
         return h3
 
@@ -219,15 +231,20 @@ out_path = args.output_dir
 if not os.path.exists(out_path):
     os.makedirs(out_path)
 
-real_data = SynthDataset(100).X 
-real_data = np.array(real_data, dtype='float32')
-data = {'train': {'x': real_data}}
+mixture_object = SynthDataset(100)
+data = {'train': {'x': mixture_object.X_train.astype(np.float32), 
+    'y': mixture_object.Y_train.astype(np.float32)}, 
+    'test': {'x': mixture_object.X_test.astype(np.float32), 
+    'y': mixture_object.Y_test.astype(np.float32)}}
 
-data = Data(data)
+one_hot_ops = [tf.one_hot(data['train']['y'], 10), tf.one_hot(data['test']['y'], 10)]
+data['train']['y'], data['test']['y'] = sess.run(one_hot_ops)
+
+data = Data(data, num_classes=10)
 data.build_graph(config)
 
 hook = Hook(1, True, show_result)
 
 m = SBGAN(generator, discriminator, n_g=config.n_g)
 #sess = tf_debug.LocalCLIDebugWrapperSession(sess)
-m.train(sess, config, data, summary=False, hooks=[hook])
+m.train(sess, config, data, summary=config.summary, hooks=[hook])

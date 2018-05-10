@@ -9,9 +9,10 @@ prior: normal
 summary_savedir: summary
 summary: True
 summary_n: 20
-exp: unsupervised
+exp: semisupervised
+summary: True
 n_supervised: 2000
-n_g: 5
+n_g: 10
 n_d: 1
 test_batch_size: 256
 output_dir: './semi-search'
