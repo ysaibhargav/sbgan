@@ -215,8 +215,9 @@ class SBGAN(object):
         def _get_var(scope):
             var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                 scope=scope)
-            return [var for var in var_list if 'weight' in var.name or 
-                    'bias' in var.name or 'kernel' in var.name]
+            return var_list
+            #return [var for var in var_list if 'weight' in var.name or 
+            #        'bias' in var.name or 'kernel' in var.name]
 
         def _flatten(main_list):
             return [item for sub_list in main_list for item in sub_list]
@@ -276,16 +277,15 @@ class SBGAN(object):
                 tf.summary.scalar('likelihood_g_%i'%i, post_g[i]-prior_g[i])
                 tf.summary.scalar('post_g_%i'%i, post_g[i])
 
-            """
                 for j, _var_g in enumerate(var_g[i]):
                     tf.summary.histogram('generator_%i_/phi_star_%s'%(i, _var_g.name), 
                             g_phi_star[i][j])
-            """
+
             for i in range(self.n_d):
                 tf.summary.scalar('prior_d_%i'%i, prior_d[i])
                 tf.summary.scalar('likelihood_d_%i'%i, post_d[i]-prior_d[i])
                 tf.summary.scalar('post_d_%i'%i, post_d[i])
-            """ 
+
                 for j, _var_d in enumerate(var_d[i]):
                     tf.summary.histogram('discriminator_%i_/phi_star_%s'%(i, _var_d.name), 
                             d_phi_star[i][j])
@@ -296,7 +296,7 @@ class SBGAN(object):
 
             for var in tf.trainable_variables():
                 tf.summary.histogram(var.name, var)
-            """
+
             merged_summary_op = tf.summary.merge_all()
             summary_writer = tf.summary.FileWriter(config.summary_savedir, 
                     graph=tf.get_default_graph())
