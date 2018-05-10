@@ -9,7 +9,7 @@ prior: normal
 summary_savedir: summary
 summary: True
 summary_n: 20
-exp: semisupervised
+exp: unsupervised
 summary: True
 n_supervised: 2000
 n_g: 10
