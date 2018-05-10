@@ -315,13 +315,6 @@ class SBGAN(object):
             # TODO: multiple opt steps 
             while True:
                 try:
-                    #print('minibatch processing')
-                    _g_bandwidth = sess.run(g_bandwidth)
-                    sess.run(g_train_steps, {\
-                            eps: config.step_size, 
-                            self.bandwidth: _g_bandwidth})
-
-
                     _d_bandwidth = sess.run(d_bandwidth)
                     if summary and update_iter % config.summary_n == 0:
                         _summary, _ = sess.run([merged_summary_op, d_train_steps], {\
@@ -333,6 +326,12 @@ class SBGAN(object):
                         sess.run(d_train_steps, {\
                                 eps: config.step_size,
                                 self.bandwidth: _d_bandwidth})
+
+                    #print('minibatch processing')
+                    _g_bandwidth = sess.run(g_bandwidth)
+                    sess.run(g_train_steps, {\
+                            eps: config.step_size, 
+                            self.bandwidth: _g_bandwidth})
 
                     update_iter += 1
 
