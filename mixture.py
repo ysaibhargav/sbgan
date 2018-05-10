@@ -4,7 +4,6 @@ import os
 import glob
 import numpy as np
 import six
-import cPickle
 import tensorflow as tf
 import scipy.io as sio
 import argparse
@@ -66,16 +65,15 @@ class SynthDataset():
         self.true_z_dim = 2
         # generate synthetic data
         self.Xs = []
-        for _ in xrange(num_clusters):
+        for _ in range(num_clusters):
             cluster_mean = np.random.randn(self.true_z_dim) * 5 # to make them more spread
             A = np.random.randn(self.x_dim, self.true_z_dim) * 5
-            X = np.dot(np.random.randn(self.N / num_clusters, self.true_z_dim) + 
-                    cluster_mean,
-                       A.T)
+            X = np.dot(np.random.randn(int(self.N / num_clusters), self.true_z_dim) + 
+                    cluster_mean, A.T)
             self.Xs.append(X)
         X_raw = np.concatenate(self.Xs)
         self.X = (X_raw - X_raw.mean(0)) / (X_raw.std(0))
-        print self.X.shape
+        print(self.X.shape)
         
         
     def next_batch(self, batch_size):
@@ -153,9 +151,9 @@ def hook_arg_filter(*_args):
 def show_result(g_z, X_real, epoch):
     X_sample = np.concatenate(g_z)
     aics_fake = gmm_ms(X_sample)
-    print "Fake number of clusters (AIC estimate):", aics_fake.argmin()
+    print("Fake number of clusters (AIC estimate): %d"%aics_fake.argmin())
     dist, X_trans_real, X_trans_fake = analyze_div(X_real, X_sample)
-    print "JS div:", dist
+    print("JS div:%g"%dist)
     fp = FigPrinter((1,2))
     xmin1 = np.min(X_trans_real[:, 0]) - 1.0
     xmax1 = np.max(X_trans_real[:, 0]) + 1.0
