@@ -200,6 +200,6 @@ if config.arch == 'dcgan':
     m = SBGAN(DCGANgenerator, DCGANdiscriminator, n_g = config.n_g, n_d = config.n_d)
 else:
     m = SBGAN(MLPgenerator, MLPdiscriminator, n_g = config.n_g, n_d=config.n_d)
-m.train(sess, config, data, summary=False, hooks = [hook1])
+m.train(sess, config, data, summary=config.summary, hooks = [hook1])
 
 

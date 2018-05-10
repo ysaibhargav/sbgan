@@ -7,6 +7,7 @@ prior_std: 1
 step_size: 0.005
 prior: normal
 summary_savedir: summary
+summary: True
 summary_n: 20
 exp: unsupervised
 n_supervised: 2000
