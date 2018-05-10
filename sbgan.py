@@ -210,8 +210,9 @@ class SBGAN(object):
         def _get_var(scope):
             var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                 scope=scope)
-            return [var for var in var_list if 'weight' in var.name or 
-                    'bias' in var.name or 'kernel' in var.name]
+            return var_list
+            #return [var for var in var_list if 'weight' in var.name or 
+            #        'bias' in var.name or 'kernel' in var.name]
 
         def _flatten(main_list):
             return [item for sub_list in main_list for item in sub_list]
