@@ -217,6 +217,11 @@ class SBGAN(object):
         def _flatten(main_list):
             return [item for sub_list in main_list for item in sub_list]
 
+        def _var_grad_pairs(gradients, variables):
+            gradients = [-w for grad in gradients for w in grad]
+            variables = _flatten(variables) 
+            return zip(gradients, variables)
+        
         eps = tf.placeholder(dtype=tf.float32)
         
         # network initialisation
@@ -251,20 +256,28 @@ class SBGAN(object):
         g_bandwidth = self._bandwidth(var_g)
         d_bandwidth = self._bandwidth(var_d)
 
+        d_opt = getattr(tf.train, config.opt + 'Optimizer')(learning_rate=config.step_size)
+        g_opt = getattr(tf.train, config.opt + 'Optimizer')(learning_rate=config.step_size)
+        
         # train steps
         # TODO: annealing
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
             g_phi_star = [self._stein_phi_star(var_g[i], var_g, post_g) \
                     for i in range(self.n_g)]
-            g_train_steps = [[tf.assign(_var_g, _var_g+eps*g_phi_star[j][i]) for i, _var_g \
-                    in enumerate(var_g[j])] for j in range(self.n_g)]
-            g_train_steps = _flatten(g_train_steps) 
-
+            #g_train_steps = [[tf.assign(_var_g, _var_g+eps*g_phi_star[j][i]) for i, _var_g \
+                    #in enumerate(var_g[j])] for j in range(self.n_g)]
+            #g_train_steps = _flatten(g_train_steps) 
+            g_pairs = _var_grad_pairs(g_phi_star, var_g)
+            g_train_steps = g_opt.apply_gradients(g_pairs)
+            
             d_phi_star = [self._stein_phi_star(var_d[i], var_d, post_d) \
                     for i in range(self.n_d)]
-            d_train_steps = [[tf.assign(_var_d, _var_d+eps*d_phi_star[j][i]) for i, _var_d \
-                    in enumerate(var_d[j])] for j in range(self.n_d)]
-            d_train_steps = _flatten(d_train_steps) 
+            #d_train_steps = [[tf.assign(_var_d, _var_d+eps*d_phi_star[j][i]) for i, _var_d \
+                    #in enumerate(var_d[j])] for j in range(self.n_d)]
+            #d_train_steps = _flatten(d_train_steps) 
+            d_pairs = _var_grad_pairs(d_phi_star, var_d)
+            d_train_steps = d_opt.apply_gradients(d_pairs)
+            
 
         if summary:
             for i in range(self.n_g):
