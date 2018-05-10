@@ -223,8 +223,8 @@ class SBGAN(object):
             return [item for sub_list in main_list for item in sub_list]
 
         def _var_grad_pairs(gradients, variables):
-            gradients = [w for grad in gradients for w in grad]
-            variables = [w for var in variables for w in var]
+            gradients = [-w for grad in gradients for w in grad]
+            variables = _flatten(variables) 
             return zip(gradients, variables)
         
         eps = tf.placeholder(dtype=tf.float32)
@@ -261,8 +261,8 @@ class SBGAN(object):
         g_bandwidth = self._bandwidth(var_g)
         d_bandwidth = self._bandwidth(var_d)
 
-        d_opt = tf.train.AdamOptimizer(learning_rate=1e-4)
-        g_opt = tf.train.AdamOptimizer(learning_rate=1e-4)
+        d_opt = getattr(tf.train, config.opt + 'Optimizer')(learning_rate=config.step_size)
+        g_opt = getattr(tf.train, config.opt + 'Optimizer')(learning_rate=config.step_size)
         
         # train steps
         # TODO: annealing
