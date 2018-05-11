@@ -4,14 +4,13 @@ z_dims: 100
 z_std: 1
 num_epochs: 100 
 prior_std: 1
-step_size: 0.0005
+step_size: 0.005
 opt: Adagrad
 prior: normal
 summary_savedir: summary
-summary: True
+summary: False 
 summary_n: 20
 exp: semisupervised
-summary: True
 n_supervised: 2000
 n_g: 5
 n_d: 1

@@ -121,9 +121,9 @@ def MLPdiscriminator(z, scope='discriminator'):
 #class and helper functions for DCGAN
 def DCGANgenerator(x, scope="generator", isTrain=True): 
     with tf.variable_scope(scope):
-        linear1 = fc(x, 2048, activation_fn=None, name='l1', reuse=tf.AUTO_REUSE)
+        linear1 = fc(x, 2048, activation_fn=None, scope='l1', reuse=tf.AUTO_REUSE)
         linear1 = relu(tf.layers.batch_normalization(linear1, training=isTrain, reuse=tf.AUTO_REUSE, name='bn0')) 
-        x = tf.reshape(x, [-1, 2, 2, 512])
+        x = tf.reshape(linear1, [-1, 2, 2, 512])
         # 1st hidden layer
         conv1 = tf.layers.conv2d_transpose(x, 384, [3, 3], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c1')
         relu1 = relu(tf.layers.batch_normalization(conv1, training=isTrain, reuse=tf.AUTO_REUSE, name='bn1'))
@@ -158,9 +158,9 @@ def DCGANdiscriminator(x, scope="discriminator", isTrain=True):
         lrelu4 = lrelu(tf.layers.batch_normalization(conv4, training=isTrain, reuse=tf.AUTO_REUSE, name='bn4'), 0.2)
         # output layer
         
-        linear1 = lrelu(fc(tf.reshape(lrelu4, [config.x_batch_size, -1]), 512, activation_fn=None, name='l1', reuse=tf.AUTO_REUSE))
+        linear1 = lrelu(fc(tf.reshape(lrelu4, [config.x_batch_size, 2048]), 512, activation_fn=None, scope='l1', reuse=tf.AUTO_REUSE))
         
-        linear2 = fc(linear1, 11, activation_fn=None, name='l2', reuse=tf.AUTO_REUSE)
+        linear2 = fc(linear1, 11, activation_fn=None, scope='l2', reuse=tf.AUTO_REUSE)
         
         return linear2
 
@@ -179,12 +179,12 @@ cifar_test_labels = np.load('cifar/cifar.test.labels.npy')
 #train_x = np.array([skimage.transform.resize(w, (64, 64)) for w in cifar_train_images])
 #test_x = np.array([skimage.transform.resize(w, (64, 64)) for w in cifar_test_images])
 print('Data preprocessing done')
-'''
+"""
 train_x_op = tf.image.resize_images(cifar_train_images, [64, 64])
 test_x_op = tf.image.resize_images(cifar_test_images, [64, 64])
 train_x, test_x = sess.run([train_x_op, test_x_op])
-'''
-
+"""
+train_x, test_x = cifar_train_images, cifar_test_images
 train_y_op = tf.one_hot(cifar_train_labels, 10)
 test_y_op = tf.one_hot(cifar_test_labels, 10)
 train_y, test_y = sess.run([train_y_op, test_y_op])
