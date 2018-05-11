@@ -16,6 +16,7 @@ from utils import AttributeDict, read_from_yaml, setup_output_dir, Data
 from sbgan import SBGAN
 import pdb
 fc = tf.contrib.layers.fully_connected
+relu = tf.nn.relu
 Hook = namedtuple("Hook", ["frequency", "is_joint", "function"])
 import logging
 from tensorflow.examples.tutorials.mnist import input_data
@@ -120,23 +121,22 @@ def MLPdiscriminator(z, scope='discriminator'):
 #class and helper functions for DCGAN
 def DCGANgenerator(x, scope="generator", isTrain=True): 
     with tf.variable_scope(scope):
-        x = tf.expand_dims(x, 1)
-        x = tf.expand_dims(x, 1)
+        linear1 = fc(x, 2048, activation_fn=None, name='l1', reuse=tf.AUTO_REUSE)
+        linear1 = relu(tf.layers.batch_normalization(linear1, training=isTrain, reuse=tf.AUTO_REUSE, name='bn0')) 
+        x = tf.reshape(x, [-1, 2, 2, 512])
         # 1st hidden layer
-        conv1 = tf.layers.conv2d_transpose(x, 1024, [4, 4], strides=(1, 1), padding='valid', reuse=tf.AUTO_REUSE, name='c1')
-        lrelu1 = lrelu(tf.layers.batch_normalization(conv1, training=isTrain, reuse=tf.AUTO_REUSE, name='bn1'), 0.2)
+        conv1 = tf.layers.conv2d_transpose(x, 384, [3, 3], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c1')
+        relu1 = relu(tf.layers.batch_normalization(conv1, training=isTrain, reuse=tf.AUTO_REUSE, name='bn1'))
         # 2nd hidden layer
-        conv2 = tf.layers.conv2d_transpose(lrelu1, 512, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c2')
-        lrelu2 = lrelu(tf.layers.batch_normalization(conv2, training=isTrain, reuse=tf.AUTO_REUSE, name='bn2'), 0.2)
+        conv2 = tf.layers.conv2d_transpose(relu1, 192, [3, 3], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c2')
+        relu2 = relu(tf.layers.batch_normalization(conv2, training=isTrain, reuse=tf.AUTO_REUSE, name='bn2'))
         # 3rd hidden layer
-        conv3 = tf.layers.conv2d_transpose(lrelu2, 256, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c3')
-        lrelu3 = lrelu(tf.layers.batch_normalization(conv3, training=isTrain, reuse=tf.AUTO_REUSE, name='bn3'), 0.2)
+        conv3 = tf.layers.conv2d_transpose(relu2, 96, [3, 3], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c3')
+        relu3 = relu(tf.layers.batch_normalization(conv3, training=isTrain, reuse=tf.AUTO_REUSE, name='bn3'))
         # 4th hidden layer
-        conv4 = tf.layers.conv2d_transpose(lrelu3, 128, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c4')
-        lrelu4 = lrelu(tf.layers.batch_normalization(conv4, training=isTrain, reuse=tf.AUTO_REUSE, name='bn4'), 0.2)
+        conv4 = tf.layers.conv2d_transpose(relu3, 3, [5, 5], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c4')
         # output layer
-        conv5 = tf.layers.conv2d_transpose(lrelu4, 3, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c5')
-        o = tf.nn.tanh(conv5)
+        o = tf.nn.tanh(conv4)
         #import pdb; pdb.set_trace()
         return o
 
@@ -145,23 +145,24 @@ def DCGANdiscriminator(x, scope="discriminator", isTrain=True):
     #x = tf.expand_dims(x, -1)
     with tf.variable_scope(scope):
         # 1st hidden layer
-        conv1 = tf.layers.conv2d(x, 128, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c1')
+        conv1 = tf.layers.conv2d(x, 96, [5, 5], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c1')
         lrelu1 = lrelu(conv1, 0.2)
         # 2nd hidden layer
-        conv2 = tf.layers.conv2d(lrelu1, 256, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c2')
+        conv2 = tf.layers.conv2d(lrelu1, 192, [3, 3], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c2')
         lrelu2 = lrelu(tf.layers.batch_normalization(conv2, training=isTrain, reuse=tf.AUTO_REUSE, name='bn2'), 0.2)
         # 3rd hidden layer
-        conv3 = tf.layers.conv2d(lrelu2, 512, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c3')
+        conv3 = tf.layers.conv2d(lrelu2, 384, [3, 3], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c3')
         lrelu3 = lrelu(tf.layers.batch_normalization(conv3, training=isTrain, reuse=tf.AUTO_REUSE, name='bn3'), 0.2)
         # 4th hidden layer
-        conv4 = tf.layers.conv2d(lrelu3, 1024, [4, 4], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c4')
+        conv4 = tf.layers.conv2d(lrelu3, 512, [3, 3], strides=(2, 2), padding='same', reuse=tf.AUTO_REUSE, name='c4')
         lrelu4 = lrelu(tf.layers.batch_normalization(conv4, training=isTrain, reuse=tf.AUTO_REUSE, name='bn4'), 0.2)
         # output layer
-        assert config.exp == 'semisupervised'
-        conv5 = tf.layers.conv2d(lrelu4, 11, [4, 4], strides=(1, 1), padding='valid', reuse=tf.AUTO_REUSE, name='c5')
-        conv5 = tf.squeeze(conv5, [1, 2])
-        #import pdb; pdb.set_trace()
-        return conv5
+        
+        linear1 = lrelu(fc(tf.reshape(lrelu4, [config.x_batch_size, -1]), 512, activation_fn=None, name='l1', reuse=tf.AUTO_REUSE))
+        
+        linear2 = fc(linear1, 11, activation_fn=None, name='l2', reuse=tf.AUTO_REUSE)
+        
+        return linear2
 
 
 args = parse_args()
@@ -175,8 +176,8 @@ cifar_train_images = np.load('cifar/cifar.train.images.npy')
 cifar_test_images = np.load('cifar/cifar.test.images.npy')
 cifar_train_labels = np.load('cifar/cifar.train.labels.npy')
 cifar_test_labels = np.load('cifar/cifar.test.labels.npy')
-train_x = np.array([skimage.transform.resize(w, (64, 64)) for w in cifar_train_images])
-test_x = np.array([skimage.transform.resize(w, (64, 64)) for w in cifar_test_images])
+#train_x = np.array([skimage.transform.resize(w, (64, 64)) for w in cifar_train_images])
+#test_x = np.array([skimage.transform.resize(w, (64, 64)) for w in cifar_test_images])
 print('Data preprocessing done')
 '''
 train_x_op = tf.image.resize_images(cifar_train_images, [64, 64])
@@ -192,7 +193,7 @@ data = {'train': {'x': train_x.astype(np.float32), 'y': train_y.astype(np.float3
         'test': {'x': test_x.astype(np.float32), 'y': test_y.astype(np.float32)}}
 
 data = Data(data, num_classes=10)
-data.build_graph(config, shape=[64, 64, 3])
+data.build_graph(config, shape=[32, 32, 3])
 if not hasattr(config, 'arch'):
     setattr(config, 'arch', 'mlp')
 
