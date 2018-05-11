@@ -175,8 +175,10 @@ def show_result(g_z, X_real, epoch):
     fp.ax_arr[0].set_aspect('equal', adjustable='box')
     fp.ax_arr[1].set_aspect('equal', adjustable='box')
     fp.ax_arr[1].set_title("Epoch %s" % (epoch))
-    fp.print_to_file(os.path.join(config.save_dir, "mixture", 
-        "pca_distribution_%s.png" % (epoch)))
+    folder_path = os.path.join(config.save_dir, "mixture")
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    fp.print_to_file(os.path.join(folder_path, "pca_distribution_%s.png" % (epoch)))
 
 def generator(z, scope='generator'):
     with tf.variable_scope(scope):
