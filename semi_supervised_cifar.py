@@ -73,7 +73,7 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
     if not os.path.exists(os.path.join("out", "cifar")):
         os.mkdir(os.path.join("out", "cifar"))
 
-    img_height = img_width = 64
+    img_height = img_width = 32
     batch_res = 0.5 * batch_res.reshape((batch_res.shape[0], \
             img_height, img_width, 3)) + 0.5
     img_h, img_w = batch_res.shape[1], batch_res.shape[2]
@@ -158,7 +158,7 @@ def DCGANdiscriminator(x, scope="discriminator", isTrain=True):
         lrelu4 = lrelu(tf.layers.batch_normalization(conv4, training=isTrain, reuse=tf.AUTO_REUSE, name='bn4'), 0.2)
         # output layer
         
-        linear1 = lrelu(fc(tf.reshape(lrelu4, [config.x_batch_size, 2048]), 512, activation_fn=None, scope='l1', reuse=tf.AUTO_REUSE))
+        linear1 = lrelu(fc(tf.reshape(lrelu4, [-1, 2048]), 512, activation_fn=None, scope='l1', reuse=tf.AUTO_REUSE))
         
         linear2 = fc(linear1, 11, activation_fn=None, scope='l2', reuse=tf.AUTO_REUSE)
         
