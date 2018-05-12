@@ -39,17 +39,24 @@ class SBGAN(object):
     def _bandwidth(self,
             particles):
         """ adaptively computes the bandwidth to make kernels sum to ~1 """
-        if len(particles) == 1: return tf.constant(1.)
+        if len(particles) == 1: return tf.constant(1.), [[tf.constant(0.)]]
         distances = []
         _particles = [self._to_tf_vec(x) for x in particles]
-        for x1, x2 in combinations(_particles, 2):
-            distances.append(tf.sqrt(tf.reduce_sum((x1-x2)*(x1-x2))))
+        kernel_matrix = [[tf.constant(0.) for _ in particles] for _ in particles]
+        for i in range(len(particles)):
+            for j in range(i+1, len(particles)):
+                x1, x2 = _particles[i], _particles[j]
+                distances.append(tf.sqrt(tf.reduce_sum((x1-x2)*(x1-x2))))
+                kernel_matrix[i][j] = self.kernel(x1, x2)
+
+        #for x1, x2 in combinations(_particles, 2):
+        #    distances.append(tf.sqrt(tf.reduce_sum((x1-x2)*(x1-x2))))
 
         m = int(np.ceil(len(distances) / 2.)) 
         distances = tf.convert_to_tensor(distances)
         median = tf.nn.top_k(distances, m).values[tf.maximum(m-1, 0)]
 
-        return median**2/np.log(len(particles))
+        return median**2/np.log(len(particles)), kernel_matrix
 
     def _kernel(self,
             kernel):
@@ -253,8 +260,8 @@ class SBGAN(object):
         for i in range(self.n_g): post_g[i] += prior_g[i]
         for i in range(self.n_d): post_d[i] += prior_d[i]
 
-        g_bandwidth = self._bandwidth(var_g)
-        d_bandwidth = self._bandwidth(var_d)
+        g_bandwidth, g_kernel_matrix = self._bandwidth(var_g)
+        d_bandwidth, d_kernel_matrix = self._bandwidth(var_d)
 
         d_opt = getattr(tf.train, config.opt + 'Optimizer')(learning_rate=config.step_size)
         g_opt = getattr(tf.train, config.opt + 'Optimizer')(learning_rate=config.step_size)
@@ -345,6 +352,16 @@ class SBGAN(object):
 
                 except tf.errors.OutOfRangeError:
                     print('Epoch done')
+                    _g_bandwidth = sess.run(g_bandwidth)
+                    _g_kernel_matrix = sess.run(g_kernel_matrix, 
+                            {self.bandwidth: _g_bandwidth}) 
+                    _d_bandwidth = sess.run(d_bandwidth)
+                    _d_kernel_matrix = sess.run(d_kernel_matrix, 
+                            {self.bandwidth: _d_bandwidth}) 
+                    print('G kernel')
+                    print(np.matrix(_g_kernel_matrix))
+                    print('D kernel')
+                    print(np.matrix(_d_kernel_matrix))
                     break
 
             if hooks != None:
