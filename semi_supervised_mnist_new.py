@@ -75,11 +75,11 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
 
     img_height = img_width = 32
     batch_res = 0.5 * batch_res.reshape((batch_res.shape[0], \
-                img_height, img_width, 1)) + 0.5
+                img_height, img_width)) + 0.5
     img_h, img_w = batch_res.shape[1], batch_res.shape[2]
     grid_h = img_h * grid_size[0] + grid_pad * (grid_size[0] - 1)
     grid_w = img_w * grid_size[1] + grid_pad * (grid_size[1] - 1)
-    img_grid = np.zeros((grid_h, grid_w, 1), dtype=np.uint8)
+    img_grid = np.zeros((grid_h, grid_w), dtype=np.uint8)
     for i, res in enumerate(batch_res):
         if i >= grid_size[0] * grid_size[1]:
             break
@@ -87,7 +87,7 @@ def show_result(batch_res, fname, grid_size=(8, 8), grid_pad=5):
         img = img.astype(np.uint8)
         row = (i // grid_size[0]) * (img_h + grid_pad)
         col = (i % grid_size[1]) * (img_w + grid_pad)
-        img_grid[row:row + img_h, col:col + img_w, :] = img
+        img_grid[row:row + img_h, col:col + img_w] = img
         folder_path = os.path.join(config.save_dir, 'cifar')
         if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
