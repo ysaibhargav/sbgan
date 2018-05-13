@@ -14,7 +14,7 @@ def parse_arguments():
 def main(args):
 	args = parse_arguments()
 	config = read_from_yaml(args.config_file)
-	hyper_params = {'step_size': ["0.0005", "0.0001", "0.001"], 'prior_std': ["1", "3"], 'supervised_scaling': ["1", "2"]}
+	hyper_params = {'step_size': ["0.00001", "0.000001", "0.000005"]}
 	hyper_params = [[(key, val) for val in hyper_params[key]] for key in hyper_params]
 	iterator = itertools.product(*hyper_params)
 	i = -1
