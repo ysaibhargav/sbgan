@@ -7,6 +7,9 @@ prior_std: 1
 step_size: 0.005
 opt: Adagrad
 prior: normal
+step_size: 0.000005
+prior: normal
+opt: RMSProp
 summary_savedir: summary
 summary: False 
 summary_n: 20
