@@ -173,7 +173,7 @@ class SBGAN(object):
 
             
                 'semi supervised'
-                post_d[i] -= config.supervised_scaling * tf.reduce_mean(
+                post_d[i] -= ((1. * config.n_supervised) / self.N) * tf.reduce_mean(
                     tf.nn.softmax_cross_entropy_with_logits(
                         labels=d_labels_classes,
                         logits=discriminators[i](data.xs)
