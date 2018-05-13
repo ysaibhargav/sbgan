@@ -63,6 +63,7 @@ class Data(object):
             
             dataset = tf.data.Dataset.from_tensor_slices((self._data['test']['x'], 
                 self._data['test']['y']))
+            dataset = dataset.shuffle(buffer_size=55000)
             if shape is not None:
                 dataset = dataset.map(lambda x, y: (tf.reshape(x, shape), y))
             dataset = dataset.batch(config.test_batch_size)
