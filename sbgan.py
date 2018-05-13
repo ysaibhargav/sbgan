@@ -292,7 +292,7 @@ class SBGAN(object):
                     #in enumerate(var_g[j])] for j in range(self.n_g)]
             #g_train_steps = _flatten(g_train_steps) 
             g_pairs = _var_grad_pairs(g_phi_star, var_g)
-            with tf.control_dependencies(g_phi_star):
+            with tf.control_dependencies(_flatten(g_phi_star)):
                 g_train_steps = g_opt.apply_gradients(g_pairs)
             
             d_phi_star = [self._stein_phi_star(var_d[i], var_d, post_d, mode='discriminator') \
@@ -301,7 +301,7 @@ class SBGAN(object):
                     #in enumerate(var_d[j])] for j in range(self.n_d)]
             #d_train_steps = _flatten(d_train_steps)
             d_pairs = _var_grad_pairs(d_phi_star, var_d)
-            with tf.control_dependencies(d_phi_star):
+            with tf.control_dependencies(_flatten(d_phi_star)):
                 d_train_steps = d_opt.apply_gradients(d_pairs)
 
         if summary:
