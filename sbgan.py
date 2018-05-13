@@ -388,9 +388,9 @@ class SBGAN(object):
         '''
         discriminators = []
         for i in range(self.n_d):
-            discriminator = self.discriminator(d_scope+"_%d_"%i)
-            if 'train' in getfullargspec(discriminator).args:
-                discriminator = partial(discriminator, train=False)
+            if 'isTrain' in getfullargspec(self.discriminator).args:
+                print('Setting BN inference mode')
+                discriminator = self.discriminator(d_scope+"_%d_"%i, isTrain=False)
             discriminators.append(discriminator)
             
         p = 0.
