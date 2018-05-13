@@ -74,14 +74,19 @@ class SBGAN(object):
 
 
     def _stein_phi_star(self,
-            theta,
-            particles,
-            posterior):
+                        theta,
+                        particles,
+                        posterior,
+                        mode='generator'):
         num_param = len(theta)
         phi_star = [0 for _ in range(num_param)]
 
         for i, particle in enumerate(particles):
-            grad_log_post = tf.gradients(posterior[i], particle)
+            if mode == 'generator':
+                grad_log_post = self.g_gradients[i]
+            else:
+                grad_log_post = self.d_gradients[i]
+                
             grad_kernel = tf.gradients(self.kernel(particle, theta), \
                     particle)
             kernel_dist = self.kernel(particle, theta)
@@ -273,8 +278,15 @@ class SBGAN(object):
 
         # train steps
         # TODO: annealing
+        self.g_gradients = []
+        self.d_gradients = []
+        for i in range(self.n_g):
+            self.g_gradients.append(tf.gradients(post_g[i], var_g[i]))
+        for i in range(self.n_d):
+            self.d_gradients.append(tf.gradients(post_d[i], var_d[i]))
+            
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-            g_phi_star = [self._stein_phi_star(var_g[i], var_g, post_g) \
+            g_phi_star = [self._stein_phi_star(var_g[i], var_g, post_g, mode='generator') \
                     for i in range(self.n_g)]
             #g_train_steps = [[tf.assign(_var_g, _var_g+eps*g_phi_star[j][i]) for i, _var_g \
                     #in enumerate(var_g[j])] for j in range(self.n_g)]
@@ -282,7 +294,7 @@ class SBGAN(object):
             g_pairs = _var_grad_pairs(g_phi_star, var_g)
             g_train_steps = g_opt.apply_gradients(g_pairs)
             
-            d_phi_star = [self._stein_phi_star(var_d[i], var_d, post_d) \
+            d_phi_star = [self._stein_phi_star(var_d[i], var_d, post_d, mode='discriminator') \
                     for i in range(self.n_d)]
             #d_train_steps = [[tf.assign(_var_d, _var_d+eps*d_phi_star[j][i]) for i, _var_d \
                     #in enumerate(var_d[j])] for j in range(self.n_d)]
