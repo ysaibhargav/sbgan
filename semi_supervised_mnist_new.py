@@ -178,6 +178,8 @@ test_x_op = tf.image.resize_images(mnist.test.images, [32, 32])
 test_x_op = (test_x_op - 0.5) / 0.5
 train_x, test_x = sess.run([train_x_op, test_x_op])
 
+train_y = mnist.train.labels
+test_y = mnist.test.labels
 data = {'train': {'x': train_x.astype(np.float32), 'y': train_y.astype(np.float32)}, 
         'test': {'x': test_x.astype(np.float32), 'y': test_y.astype(np.float32)}}
 
