@@ -36,7 +36,7 @@ def main(args):
                 cidx = [s for s in _file.split(os.path.sep)[-1] if s.isdigit()].join("")
                 f.write('python3 %s -cf %s &> %s\n'%(args.py, _file,
                     os.path.join(args.ldir, 'out_%s.txt'%cidx)))
-                f.write('sleep 5\n\n')
+                f.write('sleep %d\n\n'%i)
 
     with open(os.path.join(args.sdir, 'run.sh'), 'w') as f:
         f.write('#!/bin/bash\n\n')
