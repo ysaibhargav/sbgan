@@ -30,7 +30,7 @@ def main(args):
     for i in range(num_scripts):
         file_list = config_files[i*num_files_per_script: min(len(config_files),
             (i+1)*num_files_per_script)]
-        gpu = gpus[i // len(gpus)]
+        gpu = gpus[i // args.n]
 
         with open(os.path.join(args.scripts_dir, 'script_%d.sh'%i), 'w') as f:
             #f.write('#!/bin/bash\n\n')
