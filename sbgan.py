@@ -52,7 +52,7 @@ class SBGAN(object):
         #for x1, x2 in combinations(_particles, 2):
         #    distances.append(tf.sqrt(tf.reduce_sum((x1-x2)*(x1-x2))))
 
-        m = int(np.ceil(len(distances) / 2.)) 
+        m = int(np.ceil(len(distances) / 2.))
         distances = tf.convert_to_tensor(distances)
         median = tf.nn.top_k(distances, m).values[tf.maximum(m-1, 0)]
 
@@ -67,7 +67,7 @@ class SBGAN(object):
                 x2 = self._to_tf_vec(x2)
 
             return tf.exp(-tf.reduce_sum((x1-x2)*(x1-x2))/self.bandwidth)
-            
+
         self.bandwidth = tf.placeholder(dtype=tf.float32, shape=())
         if kernel == "rbf":
             return _rbf
@@ -86,7 +86,7 @@ class SBGAN(object):
                 grad_log_post = self.g_gradients[i]
             else:
                 grad_log_post = self.d_gradients[i]
-                
+
             grad_kernel = tf.gradients(self.kernel(particle, theta), \
                     particle)
             kernel_dist = self.kernel(particle, theta)
@@ -98,7 +98,7 @@ class SBGAN(object):
             phi_star[j] /= len(particles)
             #phi_star[j] = tf.clip_by_norm(phi_star[j], 10)
 
-        return phi_star 
+        return phi_star
 
 
     def _prior(self,
@@ -126,7 +126,7 @@ class SBGAN(object):
                             logits=discriminators[j](generators[i](data.z[0][i]))
                         )
                     )
-        
+
         with tf.name_scope('unsupervised_posterior/disc/'):
             post_d = [0. for _ in range(self.n_d)]
             d_labels_real = tf.constant(1., shape=(config.x_batch_size, 1))
@@ -143,14 +143,14 @@ class SBGAN(object):
                             logits=discriminators[i](generators[j](data.z[0][j]))
                         )
                     )
-        
+
         return post_g, post_d
 
     def _semisupervised_posterior(self, generators, discriminators, data, config):
         num_classes = data.n_classes
         with tf.name_scope('semisupervised_posterior/gen/'):
             post_g = [0. for _ in range(self.n_g)]
-            g_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * 
+            g_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] *
                     config.z_batch_size)
             for i in range(self.n_g):
                 for j in range(self.n_d):
@@ -160,13 +160,13 @@ class SBGAN(object):
                     prob_except_fake = tf.reduce_logsumexp(logits[:, 1:], axis = 1)
                     prob = tf.reduce_logsumexp(logits, axis = 1)
                     post_g[i] += tf.reduce_mean(prob_except_fake - prob)
-        
+
         with tf.name_scope('semisupervised_posterior/disc/'):
             post_d = [0. for _ in range(self.n_d)]
             d_labels_fake = tf.constant([[1.] + [0.] * num_classes] * config.z_batch_size)
-            d_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] * 
+            d_labels_real = tf.constant([[0.] + [1. / num_classes] * num_classes] *
                     config.x_batch_size)
-            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.x_batch_size, 
+            d_labels_classes = tf.concat(values=[tf.constant(0., shape=[config.x_batch_size,
                 1]), data.ys], axis=1)
             for i in range(self.n_d):
                 'real samples'
@@ -174,30 +174,38 @@ class SBGAN(object):
                 logits = discriminators[i](data.x[i])
                 prob_except_fake = tf.reduce_logsumexp(logits[:, 1:], axis = 1)
                 prob = tf.reduce_logsumexp(logits, axis = 1)
-                post_d[i] += tf.reduce_mean(prob_except_fake - prob)
+                l_d0 = tf.reduce_mean(prob_except_fake - prob)
+                post_d[i] += l_d0
 
-            
                 'semi supervised'
-                post_d[i] -= ((1. * config.n_supervised) / self.N) * tf.reduce_mean(
+                l_d1 = ((1. * config.n_supervised) / self.N) * tf.reduce_mean(
                     tf.nn.softmax_cross_entropy_with_logits(
                         labels=d_labels_classes,
                         logits=discriminators[i](data.xs)
                     )
                 )
-                
-                
+                post_d[i] -= l_d1
+
+
                 'generated samples'
+                l_d2 = 0
                 for j in range(self.n_g):
-                    post_d[i] -= tf.reduce_mean(
+                    l_d2 += tf.reduce_mean(
                         tf.nn.softmax_cross_entropy_with_logits(
                             labels=d_labels_fake,
                             logits=discriminators[i](generators[j](data.z[0][j]))
                         )
                     )
+                post_d[i] -= l_d2
+
+                if config.summary:
+                    tf.summary.scalar('likelihood_d_%d/real'%i, l_d0)
+                    tf.summary.scalar('likelihood_d_%d/semi'%i, l_d1)
+                    tf.summary.scalar('likelihood_d_%d/gen'%i, l_d2)
 
         return post_g, post_d
 
-    
+
     def train(self,
             sess,
             config,
@@ -214,7 +222,7 @@ class SBGAN(object):
                 z_std
                 num_epochs
                 num_svgd_iterations
-                step_size 
+                step_size
                 prior_std
         """
         self.N = data.data_len
@@ -223,7 +231,7 @@ class SBGAN(object):
             var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, \
                 scope=scope)
             return var_list
-            #return [var for var in var_list if 'weight' in var.name or 
+            #return [var for var in var_list if 'weight' in var.name or
             #        'bias' in var.name or 'kernel' in var.name]
 
         def _flatten(main_list):
@@ -231,36 +239,36 @@ class SBGAN(object):
 
         def _var_grad_pairs(gradients, variables):
             gradients = [-w for grad in gradients for w in grad]
-            variables = _flatten(variables) 
+            variables = _flatten(variables)
             return zip(gradients, variables)
-        
+
         eps = tf.placeholder(dtype=tf.float32)
-        
+
         # network initialisation
         # initialize points from the prior (page 6, section 5)
         generators = [self.generator(g_scope+"_%d_"%i) for i in range(self.n_g)]
         discriminators = [self.discriminator(d_scope+"_%d_"%i) for i in range(self.n_d)]
         test_generators = generators
         test_discriminators = discriminators
-        if self.use_bnorm: 
-            test_generators = [self.generator(g_scope+"_%d_"%i, False) 
+        if self.use_bnorm:
+            test_generators = [self.generator(g_scope+"_%d_"%i, False)
                     for i in range(self.n_g)]
-            test_discriminators = [self.discriminator(d_scope+"_%d_"%i, False) 
+            test_discriminators = [self.discriminator(d_scope+"_%d_"%i, False)
                     for i in range(self.n_d)]
 
         if config.exp == 'unsupervised':
-            post_g, post_d = self._unsupervised_posterior(generators, discriminators, data, 
+            post_g, post_d = self._unsupervised_posterior(generators, discriminators, data,
                     config)
         elif config.exp == 'semisupervised':
-            post_g, post_d = self._semisupervised_posterior(generators, discriminators, 
+            post_g, post_d = self._semisupervised_posterior(generators, discriminators,
                     data, config)
-        
+
         var_g = [_get_var(g_scope+"_%d_"%i) for i in range(self.n_g)]
         var_d = [_get_var(d_scope+"_%d_"%i) for i in range(self.n_d)]
 
         # priors
         prior_g = [self._prior(_var_g, config) for _var_g in var_g]
-        prior_d = [self._prior(_var_d, config) for _var_d in var_d] 
+        prior_d = [self._prior(_var_d, config) for _var_d in var_d]
 
         for i in range(self.n_g): post_g[i] += prior_g[i]
         for i in range(self.n_d): post_d[i] += prior_d[i]
@@ -270,7 +278,7 @@ class SBGAN(object):
 
         d_opt = getattr(tf.train, config.opt + 'Optimizer')(learning_rate=config.step_size)
         g_opt = getattr(tf.train, config.opt + 'Optimizer')(learning_rate=config.step_size)
-        
+
         # train steps
         # TODO: annealing
         self.g_gradients = []
@@ -279,22 +287,22 @@ class SBGAN(object):
             self.g_gradients.append(tf.gradients(post_g[i], var_g[i]))
         for i in range(self.n_d):
             self.d_gradients.append(tf.gradients(post_d[i], var_d[i]))
-            
+
         with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
             g_phi_star = [self._stein_phi_star(var_g[i], var_g, post_g, mode='generator') \
                     for i in range(self.n_g)]
             #g_train_steps = [[tf.assign(_var_g, _var_g+eps*g_phi_star[j][i]) for i, _var_g \
                     #in enumerate(var_g[j])] for j in range(self.n_g)]
-            #g_train_steps = _flatten(g_train_steps) 
+            #g_train_steps = _flatten(g_train_steps)
             g_pairs = _var_grad_pairs(g_phi_star, var_g)
             with tf.control_dependencies(_flatten(g_phi_star)):
                 g_train_steps = g_opt.apply_gradients(g_pairs)
-            
+
             d_phi_star = [self._stein_phi_star(var_d[i], var_d, post_d, mode='discriminator') \
                     for i in range(self.n_d)]
             #d_train_steps = [[tf.assign(_var_d, _var_d+eps*d_phi_star[j][i]) for i, _var_d \
                     #in enumerate(var_d[j])] for j in range(self.n_d)]
-            #d_train_steps = _flatten(d_train_steps) 
+            #d_train_steps = _flatten(d_train_steps)
             d_pairs = _var_grad_pairs(d_phi_star, var_d)
             with tf.control_dependencies(_flatten(d_phi_star)):
                 d_train_steps = d_opt.apply_gradients(d_pairs)
@@ -308,7 +316,7 @@ class SBGAN(object):
 
             """
                 for j, _var_g in enumerate(var_g[i]):
-                    tf.summary.histogram('generator_%i_/phi_star_%s'%(i, _var_g.name), 
+                    tf.summary.histogram('generator_%i_/phi_star_%s'%(i, _var_g.name),
                             g_phi_star[i][j])
             """
             for i in range(self.n_d):
@@ -317,7 +325,7 @@ class SBGAN(object):
                 tf.summary.scalar('post_d_%i'%i, post_d[i])
             """
                 for j, _var_d in enumerate(var_d[i]):
-                    tf.summary.histogram('discriminator_%i_/phi_star_%s'%(i, _var_d.name), 
+                    tf.summary.histogram('discriminator_%i_/phi_star_%s'%(i, _var_d.name),
                             d_phi_star[i][j])
             tf.summary.scalar('g_bandwidth', g_bandwidth)
 
@@ -327,7 +335,7 @@ class SBGAN(object):
                 tf.summary.histogram(var.name, var)
             """
             merged_summary_op = tf.summary.merge_all()
-            summary_writer = tf.summary.FileWriter(config.summary_savedir, 
+            summary_writer = tf.summary.FileWriter(config.summary_savedir,
                     graph=tf.get_default_graph())
 
         init = tf.global_variables_initializer()
@@ -335,13 +343,13 @@ class SBGAN(object):
 
         update_iter = 0
         # run
-        for epoch in range(config.num_epochs): 
+        for epoch in range(config.num_epochs):
             print(epoch)
-            sess.run(data.unsupervised_iterator.initializer, 
+            sess.run(data.unsupervised_iterator.initializer,
                     {data.x_placeholder: data._x_train})
             if config.exp == 'semisupervised':
                 sess.run(data.supervised_iterator.initializer)
-            # TODO: multiple opt steps 
+            # TODO: multiple opt steps
             while True:
                 try:
                     _d_bandwidth = sess.run(d_bandwidth)
@@ -359,7 +367,7 @@ class SBGAN(object):
                     #print('minibatch processing')
                     _g_bandwidth = sess.run(g_bandwidth)
                     sess.run(g_train_steps, {\
-                            eps: config.step_size, 
+                            eps: config.step_size,
                             self.bandwidth: _g_bandwidth})
 
                     update_iter += 1
@@ -367,11 +375,11 @@ class SBGAN(object):
                 except tf.errors.OutOfRangeError:
                     print('Epoch done')
                     _g_bandwidth = sess.run(g_bandwidth)
-                    _g_kernel_matrix = sess.run(g_kernel_matrix, 
-                            {self.bandwidth: _g_bandwidth}) 
+                    _g_kernel_matrix = sess.run(g_kernel_matrix,
+                            {self.bandwidth: _g_bandwidth})
                     _d_bandwidth = sess.run(d_bandwidth)
-                    _d_kernel_matrix = sess.run(d_kernel_matrix, 
-                            {self.bandwidth: _d_bandwidth}) 
+                    _d_kernel_matrix = sess.run(d_kernel_matrix,
+                            {self.bandwidth: _d_bandwidth})
                     print('G kernel')
                     print(np.matrix(_g_kernel_matrix))
                     print('D kernel')
@@ -388,7 +396,7 @@ class SBGAN(object):
                             self.test(sess, data, d_scope='discriminator')
 
                         if hook.is_joint:
-                            hook.function(**{"g_z": out, 
+                            hook.function(**{"g_z": out,
                                 "real_data": data._data['train']['x'],
                                 "epoch": "%d"%(epoch)})
                         else:
@@ -408,7 +416,7 @@ class SBGAN(object):
             else:
                 discriminator = self.discriminator(d_scope+"_%d_"%i)
             discriminators.append(discriminator)
-            
+
         p = 0.
         for i in range(self.n_d):
             '''
