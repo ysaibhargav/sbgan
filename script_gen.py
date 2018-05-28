@@ -5,7 +5,7 @@ import sys
 
 
 def parse_arguments():
-    parse = argparse.ArgumentParser(description='Script generator')
+    parser = argparse.ArgumentParser(description='Script generator')
     parser.add_argument('-cdir', '--config_dir', dest='config_dir', type=str,
             default='config')
     parser.add_argument('-ldir', '--log_dir', dest='log_dir', type=str, default='logs')
@@ -23,25 +23,30 @@ def main(args):
     gpus = args.gpus.split(",")
     num_scripts = args.n * len(gpus)
     num_files_per_script = len(config_files) // num_scripts
-
+    if not os.path.exists(args.scripts_dir):
+        os.makedirs(args.scripts_dir)
+    if not os.path.exists(args.log_dir):
+        os.makedirs(args.log_dir)
     for i in range(num_scripts):
-        file_list = config_files[i*num_scripts: min(len(config_files), (i+1)*num_scripts)]
-        gpu = gpus[i // len(gpus)]
+        file_list = config_files[i*num_files_per_script: min(len(config_files),
+            (i+1)*num_files_per_script)]
+        gpu = gpus[i // args.n]
 
-        with open(os.path.join(args.sdir, 'script_%d.sh'%i), 'w') as f:
+        with open(os.path.join(args.scripts_dir, 'script_%d.sh'%i), 'w') as f:
             #f.write('#!/bin/bash\n\n')
             f.write('export CUDA_VISIBLE_DEVICES=%d;\n\n'%(int(gpu)))
 
             for _file in file_list:
-                cidx = [s for s in _file.split(os.path.sep)[-1] if s.isdigit()].join("")
+                cidx = "".join([s for s in _file.split(os.path.sep)[-1] if s.isdigit()])
                 f.write('python3 %s -cf %s &> %s\n'%(args.py, _file,
-                    os.path.join(args.ldir, 'out_%s.txt'%cidx)))
+                    os.path.join(args.log_dir, 'out_%s.txt'%cidx)))
                 f.write('sleep %d\n\n'%i)
 
-    with open(os.path.join(args.sdir, 'run.sh'), 'w') as f:
+    with open(os.path.join(args.scripts_dir, 'run.sh'), 'w') as f:
         f.write('#!/bin/bash\n\n')
-        f.write(['sh %s'%(os.path.join("script_%d.sh"%i)) for i in
-            range(num_scripts)].join('\n\n'))
+        f.write("\n\n".join(['sh %s'%(os.path.join("script_%d.sh"%i)) for i in
+            range(num_scripts)]))
+        f.write("\n")
 
 
 if __name__ == '__main__':
