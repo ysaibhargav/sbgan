@@ -1,4 +1,4 @@
 # Stein Bayesian GAN
 
-[gan.py](https://github.com/ysaibhargav/sbgan/blob/master/gan.py) is an implementation of the MLE GAN  
-[mnist.py](https://github.com/ysaibhargav/sbgan/blob/master/mnist.py) contains code for MNIST sample generation with the MLE GAN
+[Our paper](https://drive.google.com/file/d/1sCQM6VbWdsSWt89Rr2rz-IIyi6Ssax7w/view?usp=sharing)
+Please note that it is a work in progress
